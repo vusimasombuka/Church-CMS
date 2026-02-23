@@ -10,24 +10,51 @@
     <strong>Rotation Notice:</strong><br>
     For message rotation to work correctly, at least 
     <strong>3 active templates</strong> are required per message type 
-    (e.g. Giving, Absentees Follow-Up).<br>
+    (e.g. Giving, Absentees Follow-Up, Visitor Follow-Up).<br>
     If fewer templates exist, the system may repeat messages.
 </div>
 
-<!-- SMART ROTATION WARNING -->
-{% set rotation_types = ["absentees_follow_up", "tithe", "offering"] %}
 
-{% for type in rotation_types %}
-    {% set count = template_counts.get(type, 0) %}
-    {% if count < 3 %}
-        <div class="alert alert-warning">
-            <strong>Rotation Warning:</strong>
-            "{{ type }}" has only {{ count }} active template(s).
-            Minimum 3 required for proper rotation.
+<!-- COMPACT ROTATION STATUS -->
+{% if all_message_types %}
+<div class="mb-3">
+
+    {% for type in all_message_types %}
+        {% set count = template_counts.get(type, 0) %}
+        {% set percentage = (count / 3 * 100) if count < 3 else 100 %}
+
+        <div class="mb-2">
+
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <small class="fw-bold text-capitalize">
+                    {{ type.replace('_', ' ') }}
+                </small>
+                <small class="text-muted">
+                    {{ count }}/3
+                </small>
+            </div>
+
+            <div class="progress" style="height: 10px;">
+    <div 
+        class="progress-bar 
+            {% if count == 0 %}bg-danger
+            {% elif count < 3 %}bg-warning
+            {% else %}bg-success
+            {% endif %}"
+        role="progressbar"
+        style="width: {{ percentage|int }}%;"
+        aria-valuenow="{{ percentage|int }}"
+        aria-valuemin="0"
+        aria-valuemax="100">
+    </div>
+</div>
+
         </div>
-    {% endif %}
-{% endfor %}
 
+    {% endfor %}
+
+</div>
+{% endif %}
 
 <form method="POST" action="{{ url_for('sms_templates.add_template') }}">
     <label>Message Type</label>
@@ -40,16 +67,14 @@
         {% endfor %}
     </select>
 
-
     <label>Message</label>
     <input type="text" name="message" required>
+
     <div class="alert alert-secondary mt-2">
-    <strong>Personalization Tip:</strong>
-    Use <code>{name}</code> anywhere in the message to insert the person's first name automatically.<br></br>
-    Example: "Hello {name}, we missed you at church." = "Hello Vusi, we missed you at church."
-</div>
-
-
+        <strong>Personalization Tip:</strong>
+        Use <code>{name}</code> anywhere in the message to insert the person's first name automatically.<br><br>
+        Example: "Hello {name}, we missed you at church." = "Hello Vusi, we missed you at church."
+    </div>
 
     <button type="submit" class="btn btn-success">Add Template</button>
 </form>
@@ -75,42 +100,39 @@
             <td>{{ t.message }}</td>
 
             <!-- Active Toggle -->
-<td>
-    <form method="POST"
-          action="{{ url_for('sms_templates.toggle_template', template_id=t.id) }}"
-          style="display:inline;">
-        <label class="switch">
-            <input type="checkbox"
-                   onchange="this.form.submit()"
-                   {% if t.active %}checked{% endif %}>
-            <span class="slider round"></span>
-        </label>
-    </form>
-</td>
+            <td>
+                <form method="POST"
+                      action="{{ url_for('sms_templates.toggle_template', template_id=t.id) }}"
+                      style="display:inline;">
+                    <label class="switch">
+                        <input type="checkbox"
+                               onchange="this.form.submit()"
+                               {% if t.active %}checked{% endif %}>
+                        <span class="slider round"></span>
+                    </label>
+                </form>
+            </td>
 
-<!-- Actions -->
-<td class="text-nowrap">
+            <!-- Actions -->
+            <td class="text-nowrap">
+                <a href="{{ url_for('sms_templates.edit_template', template_id=t.id) }}"
+                   class="btn btn-primary btn-sm">
+                    Edit
+                </a>
 
-    <a href="{{ url_for('sms_templates.edit_template', template_id=t.id) }}"
-       class="btn btn-primary btn-sm">
-        Edit
-    </a>
-
-    <form method="POST"
-          action="{{ url_for('sms_templates.delete_template', template_id=t.id) }}"
-          style="display:inline;"
-          onsubmit="return confirm('Are you sure you want to delete this template?');">
-        <button type="submit" class="btn btn-danger btn-sm">
-            Delete
-        </button>
-    </form>
-
-</td>
+                <form method="POST"
+                      action="{{ url_for('sms_templates.delete_template', template_id=t.id) }}"
+                      style="display:inline;"
+                      onsubmit="return confirm('Are you sure you want to delete this template?');">
+                    <button type="submit" class="btn btn-danger btn-sm">
+                        Delete
+                    </button>
+                </form>
+            </td>
 
         </tr>
         {% endfor %}
     </tbody>
 </table>
-
 
 {% endblock %}

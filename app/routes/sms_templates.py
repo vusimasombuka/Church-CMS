@@ -24,13 +24,13 @@ from app.models.lookup import Lookup
 @login_required
 @role_required("admin", "super_admin")
 def list_templates():
-    
-    templates = SMSTemplate.query.order_by(SMSTemplate.id.desc()).all()
 
-    # Count active templates per message type
     from sqlalchemy import func
 
-    counts = dict(
+    templates = SMSTemplate.query.order_by(SMSTemplate.id.desc()).all()
+
+    # Count ACTIVE templates per message type
+    template_counts_query = (
         db.session.query(
             SMSTemplate.message_type,
             func.count(SMSTemplate.id)
@@ -40,6 +40,18 @@ def list_templates():
         .all()
     )
 
+    template_counts = {t[0]: t[1] for t in template_counts_query}
+
+    # Get ALL message types that exist in DB (active or inactive)
+    all_types_query = (
+        db.session.query(SMSTemplate.message_type)
+        .distinct()
+        .all()
+    )
+
+    all_message_types = [t[0] for t in all_types_query]
+
+    # For dropdown
     offering_types = Lookup.query.filter_by(category="offering_type").all()
     sms_types = Lookup.query.filter_by(category="sms_type").all()
     message_types = offering_types + sms_types
@@ -47,8 +59,9 @@ def list_templates():
     return render_template(
         "sms_templates.html",
         templates=templates,
-        template_counts=counts,
-        message_types=message_types
+        template_counts=template_counts,
+        message_types=message_types,
+        all_message_types=all_message_types
     )
 
 
