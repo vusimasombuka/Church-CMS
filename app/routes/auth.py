@@ -160,20 +160,22 @@ def delete_user(user_id):
 def setup():
 
     from app.models.user import User
-    from werkzeug.security import generate_password_hash
+    from app.models.branch import Branch
     from app.extensions import db
+    from werkzeug.security import generate_password_hash
+    from flask import abort, flash, render_template, redirect, url_for, request
 
     # Block access if a user already exists
     if User.query.count() > 0:
         abort(403)
 
     if request.method == "POST":
+        branch_name = request.form["branch_name"].strip()
         username = request.form["username"].strip()
         password = request.form["password"]
         confirm_password = request.form["confirm_password"]
 
-        # Basic validation
-        if not username or not password:
+        if not branch_name or not username or not password:
             flash("All fields are required.", "error")
             return render_template("setup.html")
 
@@ -181,11 +183,17 @@ def setup():
             flash("Passwords do not match.", "error")
             return render_template("setup.html")
 
-        # Create super admin
+        # 1️⃣ Create branch FIRST
+        branch = Branch(name=branch_name)
+        db.session.add(branch)
+        db.session.commit()
+
+        # 2️⃣ Create super admin linked to branch
         user = User(
             username=username,
             password_hash=generate_password_hash(password),
-            role="super_admin"
+            role="super_admin",
+            branch_id=branch.id
         )
 
         db.session.add(user)
