@@ -309,7 +309,7 @@ def add_giving():
                     related_table="giving",
                     related_id=giving.id,
                     status="pending",
-                    branch_id=1,
+                    branch_id=current_user.branch_id,
                     template_id=template.id
                 )
 

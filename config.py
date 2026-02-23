@@ -5,6 +5,9 @@ BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key")
 
+    CLICKATELL_API_KEY = os.getenv("CLICKATELL_API_KEY")
+    CLICKATELL_SENDER_ID = os.getenv("CLICKATELL_SENDER_ID")
+    
     db_url = os.getenv("DATABASE_URL")
 
     if db_url:
