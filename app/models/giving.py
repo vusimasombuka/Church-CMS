@@ -12,6 +12,7 @@ class Giving(db.Model):
 
 
     phone = db.Column(db.String(20), nullable=True, index=True)
+    giver_name = db.Column(db.String(150), nullable=True)
 
     member_id = db.Column(
         db.Integer,
