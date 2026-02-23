@@ -26,6 +26,9 @@ from app.models.service import Service
 giving_bp = Blueprint("giving", __name__, url_prefix="/giving")
 
 
+from datetime import datetime
+from sqlalchemy import func, extract
+
 @giving_bp.route("/dashboard")
 @login_required
 @role_required("super_admin", "admin", "finance")
@@ -34,13 +37,28 @@ def giving_dashboard():
     now = datetime.utcnow()
 
     # =========================
+    # DATE RANGE FOR CURRENT MONTH
+    # =========================
+    start_of_month = datetime(now.year, now.month, 1)
+
+    if now.month == 12:
+        end_of_month = datetime(now.year + 1, 1, 1)
+    else:
+        end_of_month = datetime(now.year, now.month + 1, 1)
+
+    # =========================
     # TOTALS
     # =========================
-    total_amount = db.session.query(func.sum(Giving.amount)).scalar() or 0
+    total_amount = (
+        db.session.query(func.sum(Giving.amount))
+        .scalar()
+        or 0
+    )
 
     month_total = (
         db.session.query(func.sum(Giving.amount))
-        .filter(func.strftime("%Y-%m", Giving.created_at) == now.strftime("%Y-%m"))
+        .filter(Giving.created_at >= start_of_month)
+        .filter(Giving.created_at < end_of_month)
         .scalar()
         or 0
     )
@@ -60,21 +78,25 @@ def giving_dashboard():
     )
 
     # =========================
-    # MONTHLY TOTALS
+    # MONTHLY TOTALS (Grouped by Year + Month)
     # =========================
     raw_monthly = (
         db.session.query(
-            func.strftime("%Y-%m", Giving.created_at),
+            extract("year", Giving.created_at).label("year"),
+            extract("month", Giving.created_at).label("month"),
             func.sum(Giving.amount)
         )
-        .group_by(func.strftime("%Y-%m", Giving.created_at))
-        .order_by(func.strftime("%Y-%m", Giving.created_at))
+        .group_by("year", "month")
+        .order_by("year", "month")
         .all()
     )
 
     monthly_totals = [
-        {"month": m, "total": float(t)}
-        for m, t in raw_monthly
+        {
+            "month": f"{int(year)}-{int(month):02d}",
+            "total": float(total)
+        }
+        for year, month, total in raw_monthly
     ]
 
     # =========================
@@ -95,7 +117,7 @@ def giving_dashboard():
     ]
 
     # =========================
-    # TYPE TOTALS
+    # MEMBER / VISITOR TOTALS
     # =========================
     type_totals = [
         {"type": "Members", "total": float(member_total)},
@@ -118,19 +140,18 @@ def giving_dashboard():
     # RECENT GIVING
     # =========================
     recent_giving = (
-    db.session.query(Giving)
-    .order_by(Giving.created_at.desc())
-    .limit(10)
-    .all()
-)
-
+        db.session.query(Giving)
+        .order_by(Giving.created_at.desc())
+        .limit(10)
+        .all()
+    )
 
     return render_template(
         "giving_dashboard.html",
-        total_amount=total_amount,
-        month_total=month_total,
-        member_total=member_total,
-        visitor_total=visitor_total,
+        total_amount=float(total_amount),
+        month_total=float(month_total),
+        member_total=float(member_total),
+        visitor_total=float(visitor_total),
         monthly_totals=monthly_totals,
         category_totals=category_totals,
         type_totals=type_totals,
