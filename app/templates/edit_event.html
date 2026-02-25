@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Edit Event{% endblock %}
+
+{% block content %}
+<h2>Edit Event</h2>
+
+<form method="POST">
+    <label>Event Title *</label>
+    <input type="text" name="title" value="{{ event.title }}" required>
+
+    <label>Event Date *</label>
+    <input type="date" name="event_date" value="{{ event.event_date.strftime('%Y-%m-%d') }}" required>
+
+    <label>Department</label>
+    <input type="text" name="department" value="{{ event.department or '' }}">
+
+    <label>Description</label>
+    <textarea name="description" rows="3">{{ event.description or '' }}</textarea>
+
+    <!-- SMS Reminder Configuration -->
+    <div style="margin: 20px 0; padding: 20px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e0e0e0;">
+        <h4 style="margin-top: 0; color: #2c3e50;">📱 SMS Reminder Settings</h4>
+        
+        <div style="margin-bottom: 15px;">
+            <input type="checkbox" name="sms_reminder_enabled" id="sms_reminder_enabled" 
+                   {% if event.sms_reminder_enabled %}checked{% endif %} 
+                   onchange="toggleReminders()" style="width: auto; margin-right: 10px;">
+            <label for="sms_reminder_enabled" style="display: inline; font-weight: 600;">
+                Enable SMS Reminders for this Event
+            </label>
+        </div>
+        
+        <div id="reminder-options" style="margin-left: 25px; {% if not event.sms_reminder_enabled %}display: none;{% endif %}">
+            <p style="font-size: 14px; color: #666; margin-bottom: 15px;">
+                Send reminders to all members and visitors:
+            </p>
+            
+            <div style="margin-bottom: 10px;">
+                <input type="checkbox" name="sms_reminder_90" 
+                       {% if event.sms_reminder_90 %}checked{% endif %} 
+                       style="width: auto; margin-right: 8px;">
+                <label style="display: inline; margin: 0;">90 days before event</label>
+            </div>
+            
+            <div style="margin-bottom: 10px;">
+                <input type="checkbox" name="sms_reminder_60" 
+                       {% if event.sms_reminder_60 %}checked{% endif %}
+                       style="width: auto; margin-right: 8px;">
+                <label style="display: inline; margin: 0;">60 days before event</label>
+            </div>
+            
+            <div style="margin-bottom: 10px;">
+                <input type="checkbox" name="sms_reminder_30" 
+                       {% if event.sms_reminder_30 %}checked{% endif %}
+                       style="width: auto; margin-right: 8px;">
+                <label style="display: inline; margin: 0;">30 days before event</label>
+            </div>
+            
+            <div style="margin-bottom: 10px;">
+                <input type="checkbox" name="sms_reminder_7" 
+                       {% if event.sms_reminder_7 %}checked{% endif %}
+                       style="width: auto; margin-right: 8px;">
+                <label style="display: inline; margin: 0;">7 days before event (optional)</label>
+            </div>
+        </div>
+    </div>
+
+    <div style="margin-top: 25px;">
+        <button type="submit" style="margin-right: 10px;">Update Event</button>
+        <a href="{{ url_for('events.events_admin') }}" 
+           style="background: #95a5a6; color: white; padding: 12px 22px; text-decoration: none; border-radius: 6px;">
+            Cancel
+        </a>
+    </div>
+</form>
+
+<script>
+function toggleReminders() {
+    var checkbox = document.getElementById('sms_reminder_enabled');
+    var options = document.getElementById('reminder-options');
+    options.style.display = checkbox.checked ? 'block' : 'none';
+}
+</script>
+{% endblock %}

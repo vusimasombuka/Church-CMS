@@ -15,6 +15,8 @@ from reportlab.lib.pagesizes import letter, A4
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
+from app.utils.branching import branch_query, enforce_branch_access
+
 
 overview_bp = Blueprint("overview", __name__, url_prefix="/overview")
 
@@ -42,8 +44,11 @@ def search():
 @role_required("super_admin", "admin")
 def profile(phone):
 
-    member = Member.query.filter_by(phone=phone).first()
-    visitor = Visitor.query.filter_by(phone=phone).first()
+    from app.utils.branching import branch_query, enforce_branch_access
+    from sqlalchemy import func
+
+    member = branch_query(Member).filter_by(phone=phone).first()
+    visitor = branch_query(Visitor).filter_by(phone=phone).first()
 
     person = member or visitor
 
@@ -51,60 +56,65 @@ def profile(phone):
         flash("No record found.", "error")
         return redirect(url_for("overview.search"))
 
+    enforce_branch_access(person)
+
     person_type = "Member" if member else "Visitor"
 
-    from sqlalchemy import func
-
-    # ================= MONTHLY GIVING TOTALS =================
     if member:
         raw_giving = (
-            db.session.query(
+            branch_query(Giving)
+            .filter(Giving.member_id == member.id)
+            .with_entities(
                 func.strftime("%Y-%m", Giving.created_at),
                 func.sum(Giving.amount)
             )
-            .filter(Giving.member_id == member.id)
             .group_by(func.strftime("%Y-%m", Giving.created_at))
             .order_by(func.strftime("%Y-%m", Giving.created_at))
+            .all()
+        )
+
+        attendance_history = (
+            branch_query(CheckIn)
+            .filter(CheckIn.member_id == member.id)
+            .order_by(CheckIn.created_at.desc())
             .all()
         )
     else:
         raw_giving = (
-            db.session.query(
+            branch_query(Giving)
+            .filter(Giving.visitor_id == visitor.id)
+            .with_entities(
                 func.strftime("%Y-%m", Giving.created_at),
                 func.sum(Giving.amount)
             )
-            .filter(Giving.visitor_id == visitor.id)
             .group_by(func.strftime("%Y-%m", Giving.created_at))
             .order_by(func.strftime("%Y-%m", Giving.created_at))
             .all()
         )
+
+        attendance_history = (
+            branch_query(CheckIn)
+            .filter(CheckIn.visitor_id == visitor.id)
+            .order_by(CheckIn.created_at.desc())
+            .all()
+        )
+
+    sms_history = SMSLog.query.filter_by(phone=phone)\
+        .order_by(SMSLog.created_at.desc()).all()
 
     monthly_giving = [
         {"month": m, "total": float(t)}
         for m, t in raw_giving
     ]
 
-
-    # Attendance
-    if member:
-        attendance_history = CheckIn.query.filter_by(member_id=member.id)\
-            .order_by(CheckIn.created_at.desc()).all()
-    else:
-        attendance_history = CheckIn.query.filter_by(visitor_id=visitor.id)\
-            .order_by(CheckIn.created_at.desc()).all()
-
-    # SMS
-    sms_history = SMSLog.query.filter_by(phone=phone)\
-        .order_by(SMSLog.created_at.desc()).all()
-
     return render_template(
-    "overview_profile.html",
-    person=person,
-    person_type=person_type,
-    monthly_giving=monthly_giving,
-    attendance_history=attendance_history,
-    sms_history=sms_history
-)
+        "overview_profile.html",
+        person=person,
+        person_type=person_type,
+        monthly_giving=monthly_giving,
+        attendance_history=attendance_history,
+        sms_history=sms_history
+    )
 
 
 @overview_bp.route("/<phone>/export")
@@ -113,13 +123,15 @@ def profile(phone):
 def export_profile(phone):
     """Export individual overview data as CSV"""
     
-    member = Member.query.filter_by(phone=phone).first()
-    visitor = Visitor.query.filter_by(phone=phone).first()
+    member = branch_query(Member).filter_by(phone=phone).first()
+    visitor = branch_query(Visitor).filter_by(phone=phone).first()
     person = member or visitor
 
     if not person:
         flash("No record found.", "error")
         return redirect(url_for("overview.search"))
+
+    enforce_branch_access(person)
 
     person_type = "Member" if member else "Visitor"
     
@@ -128,7 +140,8 @@ def export_profile(phone):
     # Get data (same queries as profile)
     if member:
         raw_giving = (
-            db.session.query(
+            branch_query(Giving)
+            .with_entities(
                 func.strftime("%Y-%m", Giving.created_at),
                 func.sum(Giving.amount)
             )
@@ -233,7 +246,8 @@ def export_profile_pdf(phone):
     # Get data (same queries as profile)
     if member:
         raw_giving = (
-            db.session.query(
+            branch_query(Giving)
+            .with_entities(
                 func.strftime("%Y-%m", Giving.created_at),
                 func.sum(Giving.amount)
             )
@@ -242,8 +256,13 @@ def export_profile_pdf(phone):
             .order_by(func.strftime("%Y-%m", Giving.created_at))
             .all()
         )
-        attendance_history = CheckIn.query.filter_by(member_id=member.id)\
-            .order_by(CheckIn.created_at.desc()).all()
+
+        attendance_history = (
+            branch_query(CheckIn)
+            .filter(CheckIn.member_id == member.id)
+            .order_by(CheckIn.created_at.desc())
+            .all()
+        )
     else:
         raw_giving = (
             db.session.query(

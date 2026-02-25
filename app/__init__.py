@@ -1,8 +1,14 @@
 from flask import Flask
 from config import Config
-from app.extensions import db, login_manager, migrate
+from app.extensions import db, login_manager, migrate, scheduler
 import os
+import logging
+from app.jobs.event_reminder_job import event_reminder_job
 
+
+# Setup logging for jobs
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def create_app():
     app = Flask(__name__)
@@ -12,13 +18,13 @@ def create_app():
     db.init_app(app)
     login_manager.init_app(app)
     migrate.init_app(app, db)
-
     
-      
+    # Import models here to avoid circular imports
+    from app.models.branch import Branch
     
     # ========================================================
-
     # Import blueprints
+    # ========================================================
     from app.routes.auth import auth_bp
     from app.routes.bootstrap import bootstrap_bp
     from app.routes.members import members_bp
@@ -33,11 +39,12 @@ def create_app():
     from app.routes.sms_logs import sms_logs_bp
     from app.routes.overview import overview_bp
     from app.routes.services import services_bp
-    
-
-
-
+    from app.routes.messaging import messaging_bp
+    from app.models.audience_segment import AudienceSegment
+    from app.models.mass_message import MassMessage
     # Register blueprints
+    
+    app.register_blueprint(messaging_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(bootstrap_bp)
     app.register_blueprint(members_bp)
@@ -61,78 +68,115 @@ def create_app():
     def shutdown_session(exception=None):
         db.session.remove()
 
-    
-
-    # ================= SCHEDULER =================
-
-
-
-    from app.extensions import scheduler
+    # ================= SCHEDULER CONFIGURATION =================
     scheduler.init_app(app)
-
-    from app.jobs.birthday_sms_job import birthday_sms_job
-    from app.jobs.sms_sender_job import send_ready_sms
-    from app.jobs.visitor_followup_job import visitor_followup_job
-    from app.jobs.visitor_sms_jobs import mark_visitor_sms_ready
-    from app.jobs.absentees_followup_job import absentees_followup_job
-
-
-    def run_job_with_context(job_func):
-        with app.app_context():
-            job_func()
-
+    
+    # Only start scheduler in production or main process (not reloader)
     if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
         scheduler.start()
+        
+        # Import jobs here to avoid circular imports
+        from app.jobs.birthday_sms_job import birthday_sms_job
+        from app.jobs.sms_sender_job import send_ready_sms
+        from app.jobs.visitor_followup_job import visitor_followup_job
+        from app.jobs.visitor_sms_jobs import mark_visitor_sms_ready
+        from app.jobs.absentees_followup_job import absentees_followup_job
+        
+        def run_with_context(func):
+            """Wrapper to provide app context for jobs"""
+            def wrapper():
+                with app.app_context():
+                    try:
+                        func()
+                        db.session.commit()
+                    except Exception as e:
+                        db.session.rollback()
+                        logger.error(f"Job {func.__name__} failed: {str(e)}")
+                        raise
+            return wrapper
+        
+        # Clear existing jobs (in case of reloads)
+        scheduler.remove_all_jobs()
+        
+        # Birthday SMS - Daily at 8:00 AM
+        scheduler.add_job(
+            id="birthday_sms_job",
+            func=run_with_context(birthday_sms_job),
+            trigger="cron",
+            hour=8,
+            minute=0,
+            replace_existing=True
+        )
+        
+        # SMS Sender - Every 5 minutes (batched)
+        scheduler.add_job(
+            id="send_ready_sms_job",
+            func=run_with_context(send_ready_sms),
+            trigger="interval",
+            minutes=5,
+            replace_existing=True
+        )
+        
+        # Visitor Follow-up - Mondays at 9:00 AM
+        scheduler.add_job(
+            id="visitor_followup_job",
+            func=run_with_context(visitor_followup_job),
+            trigger="cron",
+            day_of_week="mon",
+            hour=9,
+            minute=0,
+            replace_existing=True
+        )
+        
+        # Visitor SMS 4-hour delay check - Every 15 minutes
+        scheduler.add_job(
+            id="mark_visitor_sms_ready_job",
+            func=run_with_context(mark_visitor_sms_ready),
+            trigger="interval",
+            minutes=15,
+            replace_existing=True
+        )
+        
+        # Absentees Follow-up - Daily at 10:00 AM
+        scheduler.add_job(
+            id="absentees_followup_job",
+            func=run_with_context(absentees_followup_job),
+            trigger="cron",
+            hour=10,
+            minute=0,
+            replace_existing=True
+        )
 
-    scheduler.add_job(
-    id="birthday_sms_job",
-    func=lambda: run_job_with_context(birthday_sms_job),
-    trigger="interval",
-    minutes=1,
-)
+        scheduler.add_job(
+        id="event_reminder_job",
+        func=run_with_context(event_reminder_job),
+        trigger="cron",
+        hour=8,  # Run at 8am daily
+        minute=0,
+        replace_existing=True
+        )
 
-    scheduler.add_job(
-    id="send_ready_sms_job",
-    func=lambda: run_job_with_context(send_ready_sms),
-    trigger="interval",
-    minutes=1,
-)
-
-    scheduler.add_job(
-    id="visitor_followup_job",
-    func=lambda: run_job_with_context(visitor_followup_job),
-    trigger="interval",
-    minutes=1,
-)
-
-    scheduler.add_job(
-    id="mark_visitor_sms_ready_job",
-    func=lambda: run_job_with_context(mark_visitor_sms_ready),
-    trigger="interval",
-    minutes=1,
-)
-
-    scheduler.add_job(
-    id="absentees_followup_job",
-    func=absentees_followup_job,
-    trigger="interval",
-    days=1,
-    replace_existing=True
-)
-
-
-
-    
     # ================= AUTO MIGRATION FOR RENDER =================
+    #with app.app_context():
+    #   try:
+    #       from flask_migrate import upgrade
+    #        upgrade()
+    #        logger.info("Database migration applied successfully.")
+    #    except Exception as e:
+    #        logger.warning(f"Migration skipped: {e}")
+    #        
+    #    # Ensure at least one branch exists for setup
+    #    if Branch.query.count() == 0:
+    #        logger.info("No branches found. Ready for /setup")
 
-    from flask_migrate import upgrade
-
+        # ================= CREATE TABLES (Development Only) =================
     with app.app_context():
-        try:
-            upgrade()
-            print("Database migration applied successfully.")
-        except Exception as e:
-            print("Migration skipped:", e)
-
-    # ==============================================================
+        db.create_all()  # Creates all tables based on your models
+        logger.info("Database tables created")
+        
+        # Check if setup needed
+        if Branch.query.count() == 0:
+            logger.info("No branches found. Ready for /setup")
+    # ================================================================
+    
     return app

@@ -16,6 +16,7 @@
     <thead>
         <tr>
             <th>Username</th>
+            <th>Branch</th>
             <th>Role</th>
             <th>Actions</th>
         </tr>
@@ -27,6 +28,9 @@
 
             <!-- USERNAME -->
             <td>{{ user.username }}</td>
+
+            <!-- Branch -->    
+             <td>{{ user.branch.name }}</td>
 
             <!-- ROLE -->
             <td>{{ user.role }}</td>

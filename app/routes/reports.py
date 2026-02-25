@@ -21,7 +21,7 @@ from app.models.visitor import Visitor
 from app.models.check_in import CheckIn
 from app.models.sms_log import SMSLog
 from app.models.service import Service
-
+from app.utils.branching import branch_query
 
 reports_bp = Blueprint("reports", __name__, url_prefix="/reports")
 
@@ -47,7 +47,7 @@ def get_tables():
 # ================= REPORTS HOME =================
 @reports_bp.route("/", methods=["GET"])
 @login_required
-@role_required("super_admin", "admin", "finance")
+@role_required("super_admin")
 def reports_home():
 
     inspector = inspect(db.engine)
@@ -71,7 +71,7 @@ def reports_home():
 # ================= RUN SQL QUERY =================
 @reports_bp.route("/run", methods=["POST"])
 @login_required
-@role_required("super_admin", "admin", "finance")
+@role_required("super_admin")
 def run_query():
 
     
@@ -112,7 +112,7 @@ def run_query():
 # ================= EXPORT SQL CSV =================
 @reports_bp.route("/export-sql-csv")
 @login_required
-@role_required("super_admin", "admin", "finance")
+@role_required("super_admin")
 def export_sql_csv():
 
     columns = session.get("last_columns")
@@ -145,14 +145,13 @@ def export_sql_csv():
 @role_required("admin", "super_admin")
 def attendance_simple():
 
-    from app.models.service import Service
-
     rows = (
-        db.session.query(
+        branch_query(CheckIn)
+        .join(Service, CheckIn.service_id == Service.id)
+        .with_entities(
             Service.name,
             db.func.count(CheckIn.id)
         )
-        .join(Service, CheckIn.service_id == Service.id)
         .group_by(Service.name)
         .all()
     )
@@ -175,14 +174,13 @@ def attendance_simple():
 @role_required("admin", "super_admin")
 def attendance_summary():
 
-    from app.models.service import Service
-
     data = (
-        db.session.query(
+        branch_query(CheckIn)
+        .join(Service, CheckIn.service_id == Service.id)
+        .with_entities(
             Service.name.label("label"),
             db.func.count(CheckIn.id).label("total")
         )
-        .join(Service, CheckIn.service_id == Service.id)
         .group_by(Service.name)
         .order_by(db.func.count(CheckIn.id).desc())
         .all()
@@ -205,7 +203,8 @@ def attendance_summary():
 def attendance_daily():
 
     rows = (
-        db.session.query(
+        branch_query(CheckIn)
+        .with_entities(
             db.func.date(CheckIn.created_at).label("label"),
             db.func.count(CheckIn.id).label("total")
         )
@@ -231,14 +230,13 @@ def attendance_daily():
 @role_required("admin", "super_admin")
 def attendance_by_service():
 
-    from app.models.service import Service
-
     rows = (
-        db.session.query(
+        branch_query(CheckIn)
+        .join(Service, CheckIn.service_id == Service.id)
+        .with_entities(
             Service.name.label("label"),
             db.func.count(CheckIn.id).label("total")
         )
-        .join(Service, CheckIn.service_id == Service.id)
         .group_by(Service.name)
         .order_by(db.func.count(CheckIn.id).desc())
         .all()
@@ -262,15 +260,15 @@ def attendance_by_service():
 def attendance_analytics():
 
     attendance_data = (
-    db.session.query(
-        Service.name.label("label"),
-        db.func.count(CheckIn.id).label("total")
+        branch_query(CheckIn)
+        .join(Service, CheckIn.service_id == Service.id)
+        .with_entities(
+            Service.name.label("label"),
+            db.func.count(CheckIn.id).label("total")
+        )
+        .group_by(Service.name)
+        .all()
     )
-    .join(Service, CheckIn.service_id == Service.id)
-    .group_by(Service.name)
-    .all()
-)
-
 
     chart_data = [
         {"label": row.label, "total": row.total}
@@ -282,13 +280,15 @@ def attendance_analytics():
         attendance_data=chart_data
     )
 
+
 @reports_bp.route("/attendance/trend")
 @login_required
 @role_required("admin", "super_admin")
 def attendance_trend():
 
     rows = (
-        db.session.query(
+        branch_query(CheckIn)
+        .with_entities(
             db.func.date(CheckIn.created_at).label("date"),
             db.func.count(CheckIn.id).label("total")
         )
@@ -314,7 +314,6 @@ def attendance_trend():
 
 
 
-
 @reports_bp.route("/reports/giving", methods=["GET"])
 @login_required
 @role_required("finance", "admin", "super_admin")
@@ -327,7 +326,8 @@ def giving_analytics():
     # 1️⃣ Selected month → totals by giving type
     # -----------------------------
     month_rows = (
-        db.session.query(
+        branch_query(Giving)
+        .with_entities(
             Giving.giving_type.label("type"),
             db.func.sum(Giving.amount).label("total")
         )
@@ -344,7 +344,6 @@ def giving_analytics():
         for r in month_rows
     ]
 
-    # Totals summary (left of legend)
     totals = {"Donation": 0, "Tithe": 0, "Offering": 0}
     for r in month_rows:
         totals[r.type] = float(r.total)
@@ -353,7 +352,8 @@ def giving_analytics():
     # 2️⃣ Full year → Jan–Dec totals
     # -----------------------------
     year_rows = (
-        db.session.query(
+        branch_query(Giving)
+        .with_entities(
             extract("month", Giving.created_at).label("month"),
             db.func.sum(Giving.amount).label("total")
         )
@@ -365,7 +365,7 @@ def giving_analytics():
 
     yearly_totals = [
         {
-            "month": calendar.month_name[int(r.month)],  # ✅ January, February
+            "month": calendar.month_name[int(r.month)],
             "total": float(r.total)
         }
         for r in year_rows
@@ -374,19 +374,17 @@ def giving_analytics():
     months = [
         {"value": i, "name": calendar.month_name[i]}
         for i in range(1, 13)
-]
-
+    ]
 
     return render_template(
-    "reports/giving.html",
-    monthly_by_type=monthly_by_type,
-    yearly_totals=yearly_totals,
-    totals=totals,
-    selected_month=selected_month,
-    year=year,
-    months=months
-)
-
+        "reports/giving.html",
+        monthly_by_type=monthly_by_type,
+        yearly_totals=yearly_totals,
+        totals=totals,
+        selected_month=selected_month,
+        year=year,
+        months=months
+    )
 
 
 
@@ -398,11 +396,14 @@ def export_giving_csv():
     import csv
     from flask import Response
 
-    rows = db.session.query(
+    rows = branch_query(Giving) \
+    .with_entities(
         Giving.giving_type,
         Giving.amount,
         Giving.created_at
-    ).order_by(Giving.created_at).all()
+    ) \
+    .order_by(Giving.created_at) \
+    .all()
 
     def generate():
         yield "Type,Amount,Date\n"
@@ -420,6 +421,7 @@ def export_giving_csv():
 def retention_monitor():
 
     from datetime import date, timedelta
+
     today = date.today()
     cutoff = today - timedelta(days=14)
 
@@ -428,7 +430,10 @@ def retention_monitor():
     def process(person, person_type):
 
         last_checkin = (
-            CheckIn.query.filter_by(**{f"{person_type}_id": person.id})
+            branch_query(CheckIn)
+            .filter(
+                getattr(CheckIn, f"{person_type}_id") == person.id
+            )
             .order_by(CheckIn.check_in_date.desc())
             .first()
         )
@@ -456,10 +461,12 @@ def retention_monitor():
             "status": status
         })
 
-    for m in Member.query.all():
+    # 🔒 Branch isolated members
+    for m in branch_query(Member).all():
         process(m, "member")
 
-    for v in Visitor.query.all():
+    # 🔒 Branch isolated visitors
+    for v in branch_query(Visitor).all():
         process(v, "visitor")
 
     return render_template(

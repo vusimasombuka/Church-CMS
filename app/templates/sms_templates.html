@@ -2,137 +2,255 @@
 {% block title %}SMS Templates{% endblock %}
 
 {% block content %}
+<h2 style="margin-bottom: 15px;">SMS Templates</h2>
 
-<h2>SMS Templates</h2>
-
-<!-- ROTATION INFO NOTICE -->
-<div class="alert alert-info" role="alert">
-    <strong>Rotation Notice:</strong><br>
-    For message rotation to work correctly, at least 
-    <strong>3 active templates</strong> are required per message type 
-    (e.g. Giving, Absentees Follow-Up, Visitor Follow-Up).<br>
-    If fewer templates exist, the system may repeat messages.
+<!-- COMPACT: Variable Reference Section -->
+<div style="background: #e3f2fd; padding: 12px 15px; border-radius: 6px; margin-bottom: 15px; border-left: 3px solid #2196f3;">
+    <h4 style="margin: 0 0 8px 0; color: #1565c0; font-size: 15px; font-weight: 600;">📋 Available Variables (Copy & Use)</h4>
+    
+    <table style="width: 100%; border-collapse: collapse; font-size: 13px; background: white;">
+        <thead style="background: #f5f5f5;">
+            <tr>
+                <th style="padding: 6px 10px; text-align: left; width: 100px; font-weight: 600; color: #555;">Variable</th>
+                <th style="padding: 6px 10px; text-align: left; font-weight: 600; color: #555;">Description</th>
+                <th style="padding: 6px 10px; text-align: center; width: 60px; font-weight: 600; color: #555;">Copy</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr style="border-bottom: 1px solid #eee;">
+                <td style="padding: 5px 10px; font-family: monospace; color: #d32f2f; font-weight: bold;">{name}</td>
+                <td style="padding: 5px 10px; color: #333;">Person's first name (works in ALL templates)</td>
+                <td style="padding: 5px 10px; text-align: center;">
+                    <button type="button" onclick="copyToClipboard('{name}')" style="padding: 2px 8px; font-size: 11px; background: #2196f3; color: white; border: none; border-radius: 3px; cursor: pointer;">Copy</button>
+                </td>
+            </tr>
+            <tr style="border-bottom: 1px solid #eee;">
+                <td style="padding: 5px 10px; font-family: monospace; color: #d32f2f; font-weight: bold;">{event_title}</td>
+                <td style="padding: 5px 10px; color: #333;">Event name (e.g., 'Youth Conference')</td>
+                <td style="padding: 5px 10px; text-align: center;">
+                    <button type="button" onclick="copyToClipboard('{event_title}')" style="padding: 2px 8px; font-size: 11px; background: #2196f3; color: white; border: none; border-radius: 3px; cursor: pointer;">Copy</button>
+                </td>
+            </tr>
+            <tr style="border-bottom: 1px solid #eee;">
+                <td style="padding: 5px 10px; font-family: monospace; color: #d32f2f; font-weight: bold;">{event_date}</td>
+                <td style="padding: 5px 10px; color: #333;">Event date (e.g., '25 December 2026')</td>
+                <td style="padding: 5px 10px; text-align: center;">
+                    <button type="button" onclick="copyToClipboard('{event_date}')" style="padding: 2px 8px; font-size: 11px; background: #2196f3; color: white; border: none; border-radius: 3px; cursor: pointer;">Copy</button>
+                </td>
+            </tr>
+            <tr style="border-bottom: 1px solid #eee;">
+                <td style="padding: 5px 10px; font-family: monospace; color: #d32f2f; font-weight: bold;">{days_until}</td>
+                <td style="padding: 5px 10px; color: #333;">Days until event (e.g., '90', '30')</td>
+                <td style="padding: 5px 10px; text-align: center;">
+                    <button type="button" onclick="copyToClipboard('{days_until}')" style="padding: 2px 8px; font-size: 11px; background: #2196f3; color: white; border: none; border-radius: 3px; cursor: pointer;">Copy</button>
+                </td>
+            </tr>
+            <tr>
+                <td style="padding: 5px 10px; font-family: monospace; color: #d32f2f; font-weight: bold;">{services}</td>
+                <td style="padding: 5px 10px; color: #333;">Service times (for visitor_followup only)</td>
+                <td style="padding: 5px 10px; text-align: center;">
+                    <button type="button" onclick="copyToClipboard('{services}')" style="padding: 2px 8px; font-size: 11px; background: #2196f3; color: white; border: none; border-radius: 3px; cursor: pointer;">Copy</button>
+                </td>
+            </tr>
+        </tbody>
+    </table>
 </div>
 
+<!-- COMPACT: Example Templates Section -->
+<div style="background: #fff8e1; padding: 12px 15px; border-radius: 6px; margin-bottom: 15px; border-left: 3px solid #ff9800;">
+    <h4 style="margin: 0 0 10px 0; color: #e65100; font-size: 15px; font-weight: 600;">✨ Example Templates (Click to Copy)</h4>
+    
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+        
+        <!-- Event Reminders -->
+        <div style="background: white; padding: 10px; border-radius: 4px; border-left: 3px solid #2196f3; font-size: 12px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                <code style="background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-size: 11px;">event_reminder_90</code>
+                <button type="button" onclick="copyExample('Hi {name}! Save the date: {event_title} on {event_date} ({days_until} days). Don\'t miss it!')" style="padding: 2px 8px; font-size: 11px; background: #ff9800; color: white; border: none; border-radius: 3px; cursor: pointer;">Copy</button>
+            </div>
+            <p style="margin: 0; color: #666; font-style: italic; line-height: 1.3;">"Hi {name}! Save the date: {event_title} on {event_date} ({days_until} days). Don't miss it!"</p>
+        </div>
+
+        <div style="background: white; padding: 10px; border-radius: 4px; border-left: 3px solid #2196f3; font-size: 12px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                <code style="background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-size: 11px;">event_reminder_30</code>
+                <button type="button" onclick="copyExample('Hi {name}! {event_title} is {days_until} days away ({event_date}). See you there!')" style="padding: 2px 8px; font-size: 11px; background: #ff9800; color: white; border: none; border-radius: 3px; cursor: pointer;">Copy</button>
+            </div>
+            <p style="margin: 0; color: #666; font-style: italic; line-height: 1.3;">"Hi {name}! {event_title} is {days_until} days away ({event_date}). See you there!"</p>
+        </div>
+
+        <!-- Check-In -->
+        <div style="background: white; padding: 10px; border-radius: 4px; border-left: 3px solid #4caf50; font-size: 12px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                <code style="background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-size: 11px;">visitor_thank_you</code>
+                <button type="button" onclick="copyExample('Hi {name}, thanks for visiting Living Waters! Hope to see you again. Sundays 9am.')" style="padding: 2px 8px; font-size: 11px; background: #ff9800; color: white; border: none; border-radius: 3px; cursor: pointer;">Copy</button>
+            </div>
+            <p style="margin: 0; color: #666; font-style: italic; line-height: 1.3;">"Hi {name}, thanks for visiting Living Waters! Hope to see you again. Sundays 9am."</p>
+        </div>
+
+        <div style="background: white; padding: 10px; border-radius: 4px; border-left: 3px solid #4caf50; font-size: 12px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                <code style="background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-size: 11px;">visitor_returning</code>
+                <button type="button" onclick="copyExample('Welcome back {name}! Great to see you again at Living Waters.')" style="padding: 2px 8px; font-size: 11px; background: #ff9800; color: white; border: none; border-radius: 3px; cursor: pointer;">Copy</button>
+            </div>
+            <p style="margin: 0; color: #666; font-style: italic; line-height: 1.3;">"Welcome back {name}! Great to see you again at Living Waters."</p>
+        </div>
+
+        <!-- Birthday -->
+        <div style="background: white; padding: 10px; border-radius: 4px; border-left: 3px solid #9c27b0; font-size: 12px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                <code style="background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-size: 11px;">birthday</code>
+                <button type="button" onclick="copyExample('Happy Birthday {name}! God bless you with many more years. From Living Waters!')" style="padding: 2px 8px; font-size: 11px; background: #ff9800; color: white; border: none; border-radius: 3px; cursor: pointer;">Copy</button>
+            </div>
+            <p style="margin: 0; color: #666; font-style: italic; line-height: 1.3;">"Happy Birthday {name}! God bless you with many more years. From Living Waters!"</p>
+        </div>
+
+        <!-- Follow-ups -->
+        <div style="background: white; padding: 10px; border-radius: 4px; border-left: 3px solid #f44336; font-size: 12px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                <code style="background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-size: 11px;">absentees_follow_up</code>
+                <button type="button" onclick="copyExample('Hi {name}, we miss you at Living Waters! Join us this Sunday.')" style="padding: 2px 8px; font-size: 11px; background: #ff9800; color: white; border: none; border-radius: 3px; cursor: pointer;">Copy</button>
+            </div>
+            <p style="margin: 0; color: #666; font-style: italic; line-height: 1.3;">"Hi {name}, we miss you at Living Waters! Join us this Sunday."</p>
+        </div>
+
+        <!-- Giving -->
+        <div style="background: white; padding: 10px; border-radius: 4px; border-left: 3px solid #ff9800; font-size: 12px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                <code style="background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-size: 11px;">tithe</code>
+                <button type="button" onclick="copyExample('Hi {name}, thank you for your tithe. God bless your generosity!')" style="padding: 2px 8px; font-size: 11px; background: #ff9800; color: white; border: none; border-radius: 3px; cursor: pointer;">Copy</button>
+            </div>
+            <p style="margin: 0; color: #666; font-style: italic; line-height: 1.3;">"Hi {name}, thank you for your tithe. God bless your generosity!"</p>
+        </div>
+
+        <div style="background: white; padding: 10px; border-radius: 4px; border-left: 3px solid #ff9800; font-size: 12px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                <code style="background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-size: 11px;">offering</code>
+                <button type="button" onclick="copyExample('Hi {name}, thank you for your offering. God sees your heart!')" style="padding: 2px 8px; font-size: 11px; background: #ff9800; color: white; border: none; border-radius: 3px; cursor: pointer;">Copy</button>
+            </div>
+            <p style="margin: 0; color: #666; font-style: italic; line-height: 1.3;">"Hi {name}, thank you for your offering. God sees your heart!"</p>
+        </div>
+
+    </div>
+</div>
+
+<!-- ROTATION INFO NOTICE -->
+<div style="background: #e1f5fe; padding: 10px 12px; border-radius: 4px; margin-bottom: 15px; font-size: 13px; color: #01579b; border-left: 3px solid #03a9f4;">
+    <strong>Rotation Tip:</strong> Create at least <strong>3 active templates</strong> per message type for rotation to work properly.
+</div>
 
 <!-- COMPACT ROTATION STATUS -->
 {% if all_message_types %}
-<div class="mb-3">
-
+<div style="margin-bottom: 15px;">
     {% for type in all_message_types %}
         {% set count = template_counts.get(type, 0) %}
         {% set percentage = (count / 3 * 100) if count < 3 else 100 %}
-
-        <div class="mb-2">
-
-            <div class="d-flex justify-content-between align-items-center mb-1">
-                <small class="fw-bold text-capitalize">
-                    {{ type.replace('_', ' ') }}
-                </small>
-                <small class="text-muted">
-                    {{ count }}/3
-                </small>
+        
+        <div style="margin-bottom: 8px;">
+            <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 2px;">
+                <span style="text-transform: capitalize; font-weight: 600; color: #333;">{{ type.replace('_', ' ') }}</span>
+                <span style="color: #666;">{{ count }}/3</span>
             </div>
-
-            <div class="progress" style="height: 10px;">
-    <div 
-        class="progress-bar 
-            {% if count == 0 %}bg-danger
-            {% elif count < 3 %}bg-warning
-            {% else %}bg-success
-            {% endif %}"
-        role="progressbar"
-        style="width: {{ percentage|int }}%;"
-        aria-valuenow="{{ percentage|int }}"
-        aria-valuemin="0"
-        aria-valuemax="100">
-    </div>
-</div>
-
+            <div style="background: #e0e0e0; height: 6px; border-radius: 3px; overflow: hidden;">
+                <div style="width: {{ percentage|int }}%; height: 100%; 
+                    {% if count == 0 %}background: #f44336;
+                    {% elif count < 3 %}background: #ff9800;
+                    {% else %}background: #4caf50;
+                    {% endif %}">
+                </div>
+            </div>
         </div>
-
     {% endfor %}
-
 </div>
 {% endif %}
 
-<form method="POST" action="{{ url_for('sms_templates.add_template') }}">
-    <label>Message Type</label>
-    <select name="message_type" required>
-        <option value="">Select Message Type</option>
-        {% for type in message_types %}
-            <option value="{{ type.value|lower }}">
-                {{ type.value }}
-            </option>
-        {% endfor %}
-    </select>
+<hr style="margin: 20px 0; border: none; border-top: 1px solid #ddd;">
 
-    <label>Message</label>
-    <input type="text" name="message" required>
-
-    <div class="alert alert-secondary mt-2">
-        <strong>Personalization Tip:</strong>
-        Use <code>{name}</code> anywhere in the message to insert the person's first name automatically.<br><br>
-        Example: "Hello {name}, we missed you at church." = "Hello Vusi, we missed you at church."
+<!-- ADD NEW TEMPLATE -->
+<h4 style="margin-bottom: 12px; font-size: 16px;">Add New Template</h4>
+<form method="POST" action="{{ url_for('sms_templates.add_template') }}" style="margin-bottom: 20px;">
+    <div style="margin-bottom: 10px;">
+        <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; color: #333;">Message Type</label>
+        <select name="message_type" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;">
+            <option value="">Select Message Type</option>
+            {% for type in message_types %}
+                <option value="{{ type.value|lower }}">{{ type.value }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    
+    <div style="margin-bottom: 10px;">
+        <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; color: #333;">Message</label>
+        <input type="text" name="message" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;" placeholder="Hi {name}, thank you for...">
     </div>
 
-    <button type="submit" class="btn btn-success">Add Template</button>
+    <button type="submit" style="padding: 8px 16px; background: #4caf50; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;">Add Template</button>
 </form>
 
-<hr>
+<hr style="margin: 20px 0; border: none; border-top: 1px solid #ddd;">
 
-<table class="table table-striped">
-    <thead>
+<!-- EXISTING TEMPLATES -->
+<h4 style="margin-bottom: 12px; font-size: 16px;">Existing Templates</h4>
+
+{% if templates %}
+<table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+    <thead style="background: #f5f5f5;">
         <tr>
-            <th style="width:5%;">ID</th>
-            <th style="width:20%;">Type</th>
-            <th style="width:40%;">Message</th>
-            <th style="width:10%;">Active</th>
-            <th style="width:25%;">Actions</th>
+            <th style="padding: 8px; text-align: left; font-weight: 600; color: #555;">Type</th>
+            <th style="padding: 8px; text-align: left; font-weight: 600; color: #555;">Message</th>
+            <th style="padding: 8px; text-align: center; font-weight: 600; color: #555; width: 50px;">Active</th>
+            <th style="padding: 8px; text-align: center; font-weight: 600; color: #555; width: 100px;">Actions</th>
         </tr>
     </thead>
-
     <tbody>
         {% for t in templates %}
-        <tr>
-            <td>{{ t.id }}</td>
-            <td>{{ t.message_type }}</td>
-            <td>{{ t.message }}</td>
-
-            <!-- Active Toggle -->
-            <td>
-                <form method="POST"
-                      action="{{ url_for('sms_templates.toggle_template', template_id=t.id) }}"
-                      style="display:inline;">
-                    <label class="switch">
-                        <input type="checkbox"
-                               onchange="this.form.submit()"
-                               {% if t.active %}checked{% endif %}>
-                        <span class="slider round"></span>
-                    </label>
+        <tr style="border-bottom: 1px solid #eee; {% if not t.active %}background: #fafafa;{% endif %}">
+            <td style="padding: 8px;">
+                <code style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-size: 11px;">{{ t.message_type }}</code>
+            </td>
+            <td style="padding: 8px; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                {{ t.message }}
+            </td>
+            <td style="padding: 8px; text-align: center;">
+                <form method="POST" action="{{ url_for('sms_templates.toggle_template', template_id=t.id) }}" style="display: inline;">
+                    <input type="checkbox" onchange="this.form.submit()" {% if t.active %}checked{% endif %} style="cursor: pointer;">
                 </form>
             </td>
-
-            <!-- Actions -->
-            <td class="text-nowrap">
-                <a href="{{ url_for('sms_templates.edit_template', template_id=t.id) }}"
-                   class="btn btn-primary btn-sm">
-                    Edit
-                </a>
-
-                <form method="POST"
-                      action="{{ url_for('sms_templates.delete_template', template_id=t.id) }}"
-                      style="display:inline;"
-                      onsubmit="return confirm('Are you sure you want to delete this template?');">
-                    <button type="submit" class="btn btn-danger btn-sm">
-                        Delete
-                    </button>
+            <td style="padding: 8px; text-align: center;">
+                <a href="{{ url_for('sms_templates.edit_template', template_id=t.id) }}" style="background: #2196f3; color: white; padding: 4px 10px; text-decoration: none; border-radius: 3px; font-size: 11px; margin-right: 4px;">Edit</a>
+                <form method="POST" action="{{ url_for('sms_templates.delete_template', template_id=t.id) }}" style="display: inline;" onsubmit="return confirm('Delete?');">
+                    <button type="submit" style="background: #f44336; color: white; padding: 4px 10px; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">Delete</button>
                 </form>
             </td>
-
         </tr>
         {% endfor %}
     </tbody>
 </table>
+{% else %}
+<p style="color: #666; font-style: italic; font-size: 13px;">No templates found.</p>
+{% endif %}
+
+<!-- Copy Functions -->
+<script>
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(function() {
+        showToast('Copied: ' + text);
+    });
+}
+
+function copyExample(text) {
+    navigator.clipboard.writeText(text).then(function() {
+        showToast('Template copied!');
+    });
+}
+
+function showToast(message) {
+    var toast = document.createElement('div');
+    toast.textContent = message;
+    toast.style.cssText = 'position: fixed; bottom: 20px; right: 20px; background: #333; color: white; padding: 10px 20px; border-radius: 4px; z-index: 9999; font-size: 13px;';
+    document.body.appendChild(toast);
+    setTimeout(function() { document.body.removeChild(toast); }, 2000);
+}
+</script>
 
 {% endblock %}

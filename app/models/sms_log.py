@@ -18,3 +18,4 @@ class SMSLog(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     branch_id = db.Column(db.Integer, db.ForeignKey("branches.id", name="fk_sms_logs_branch_id"))
     template_id = db.Column(db.Integer, db.ForeignKey("sms_templates.id"), nullable=True)
+    mass_message_id = db.Column(db.Integer, db.ForeignKey("mass_messages.id"), nullable=True, index=True)

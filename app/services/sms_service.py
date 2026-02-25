@@ -32,15 +32,12 @@ def log_sms(
     phone,
     message,
     message_type,
+    branch_id,
     related_table=None,
     related_id=None,
     status="pending",
     error=None
 ):
-    """
-    Logs an SMS to sms_logs table.
-    This does NOT send the SMS — safe for production.
-    """
 
     sms = SMSLog(
         phone=phone,
@@ -50,6 +47,7 @@ def log_sms(
         related_id=related_id,
         status=status,
         error=error,
+        branch_id=branch_id
     )
 
     db.session.add(sms)
@@ -61,6 +59,7 @@ def send_and_log_sms(
     phone,
     message,
     message_type,
+    branch_id,
     related_table=None,
     related_id=None
 ):
@@ -75,7 +74,7 @@ def send_and_log_sms(
         related_table=related_table,
         related_id=related_id,
         status="pending",
-        branch_id=1
+        branch_id=branch_id
     )
 
     db.session.add(sms)

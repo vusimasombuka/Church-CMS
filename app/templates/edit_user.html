@@ -16,6 +16,16 @@
         <option value="admin" {% if user.role == "admin" %}selected{% endif %}>Admin</option>
     </select>
 
+    <label>Branch</label>
+    <select name="branch_id" required>
+    {% for branch in branches %}
+        <option value="{{ branch.id }}"
+            {% if user.branch_id == branch.id %}selected{% endif %}>
+            {{ branch.name }}
+        </option>
+    {% endfor %}
+</select>
+
     <label>New Password (leave blank to keep current)</label>
     <input type="password" name="password">
 

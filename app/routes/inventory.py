@@ -7,7 +7,7 @@ from app.models.lookup import Lookup
 from app.models.member import Member
 from app.models.giving import Giving
 from flask import flash
-
+from flask_login import current_user
 
 inventory_bp = Blueprint("inventory", __name__, url_prefix="/inventory")
 
@@ -17,11 +17,17 @@ inventory_bp = Blueprint("inventory", __name__, url_prefix="/inventory")
 @role_required("super_admin", "admin", "finance")
 def inventory_home():
 
+    from app.utils.branching import branch_query
     from app.models.lookup import Lookup
     from app.models.inventory import InventoryItem
 
+    # Departments (global lookup – no branch isolation unless you redesign it)
     departments = Lookup.query.filter_by(category="department").all()
-    items = InventoryItem.query.order_by(InventoryItem.name).all()
+
+    # Inventory Items (branch isolated)
+    items = branch_query(InventoryItem) \
+        .order_by(InventoryItem.name) \
+        .all()
 
     return render_template(
         "inventory.html",
@@ -38,19 +44,65 @@ def inventory_home():
 @role_required("super_admin", "admin", "finance")
 def add_inventory():
 
+    from app.models.inventory import InventoryItem
+
     name = request.form.get("name")
     quantity = request.form.get("quantity")
     notes = request.form.get("notes")
     department_id = request.form.get("department_id")
 
+    # Branch assignment
+    if current_user.role == "super_admin":
+        branch_id = request.form.get("branch_id")
+    else:
+        branch_id = current_user.branch_id
+
     new_item = InventoryItem(
         name=name,
         quantity=int(quantity),
         notes=notes,
-        department_id=int(department_id)
+        department_id=int(department_id),
+        branch_id=branch_id
     )
 
     db.session.add(new_item)
+    db.session.commit()
+
+    return redirect(url_for("inventory.inventory_home"))
+
+@inventory_bp.route("/edit/<int:item_id>", methods=["POST"])
+@login_required
+@role_required("super_admin", "admin", "finance")
+def edit_inventory(item_id):
+
+    from app.models.inventory import InventoryItem
+    from app.utils.branching import enforce_branch_access
+
+    item = InventoryItem.query.get_or_404(item_id)
+    enforce_branch_access(item)
+
+    item.name = request.form.get("name")
+    item.quantity = int(request.form.get("quantity"))
+    item.notes = request.form.get("notes")
+    item.department_id = int(request.form.get("department_id"))
+
+    db.session.commit()
+
+    return redirect(url_for("inventory.inventory_home"))
+
+
+@inventory_bp.route("/delete/<int:item_id>", methods=["POST"])
+@login_required
+@role_required("super_admin", "admin", "finance")
+def delete_inventory(item_id):
+
+    from app.models.inventory import InventoryItem
+    from app.utils.branching import enforce_branch_access
+
+    item = InventoryItem.query.get_or_404(item_id)
+    enforce_branch_access(item)
+
+    db.session.delete(item)
     db.session.commit()
 
     return redirect(url_for("inventory.inventory_home"))
@@ -98,7 +150,7 @@ def manage_lookup():
         flash("Value added successfully.", "success")
         return redirect(url_for("inventory.manage_lookup"))
 
-    categories = ["department", "title", "marital_status", "offering_type", "sms_type"]
+    categories = ["department", "title", "marital_status", "member_status", "offering_type", "sms_type"]
 
     lookup_data = {
         cat: Lookup.query.filter_by(category=cat)

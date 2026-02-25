@@ -70,7 +70,14 @@ from flask_login import login_required, current_user
 @login_required
 @role_required("super_admin", "admin")
 def users_list():
-    users = User.query.order_by(User.username).all()
+
+    if current_user.role == "super_admin":
+        users = User.query.order_by(User.username).all()
+    else:
+        users = User.query.filter_by(
+            branch_id=current_user.branch_id
+        ).order_by(User.username).all()
+
     return render_template("users.html", users=users)
 
 
@@ -80,13 +87,35 @@ def users_list():
 @role_required("super_admin", "admin")
 def add_user():
 
+    from app.models.branch import Branch
+    from werkzeug.security import generate_password_hash
+
+    # Super admin can see all branches
+    if current_user.role == "super_admin":
+        branches = Branch.query.order_by(Branch.name).all()
+    else:
+        # Admin can only assign users to their own branch
+        branches = Branch.query.filter_by(
+            id=current_user.branch_id
+        ).all()
+
     if request.method == "POST":
         username = request.form["username"].strip()
         password = request.form["password"]
         role = request.form["role"]
+        branch_id = request.form.get("branch_id")
 
-        if role == "super_admin":
+        if not branch_id:
+            return "Branch is required", 400
+
+        # 🔒 Admin cannot create super_admin
+        if role == "super_admin" and current_user.role != "super_admin":
             abort(403)
+
+        # 🔒 Admin cannot assign user to another branch
+        if current_user.role != "super_admin":
+            if int(branch_id) != current_user.branch_id:
+                abort(403)
 
         existing = User.query.filter_by(username=username).first()
         if existing:
@@ -95,7 +124,8 @@ def add_user():
         user = User(
             username=username,
             password_hash=generate_password_hash(password),
-            role=role
+            role=role,
+            branch_id=int(branch_id)
         )
 
         db.session.add(user)
@@ -103,8 +133,7 @@ def add_user():
 
         return redirect(url_for("auth.users_list"))
 
-    return render_template("add_user.html")
-
+    return render_template("add_user.html", branches=branches)
 
 # ================= EDIT USER =================
 @auth_bp.route("/users/edit/<int:user_id>", methods=["GET", "POST"])
@@ -112,27 +141,60 @@ def add_user():
 @role_required("super_admin", "admin")
 def edit_user(user_id):
 
+    from app.models.branch import Branch
+    from werkzeug.security import generate_password_hash
+
     user = User.query.get_or_404(user_id)
+
+    # 🔒 Block cross-branch access (admin cannot edit other branches)
+    if current_user.role != "super_admin":
+        if user.branch_id != current_user.branch_id:
+            abort(403)
+
+    # 🔒 Admin cannot edit super_admin
+    if user.role == "super_admin" and current_user.role != "super_admin":
+        abort(403)
+
+    # Super admin sees all branches
+    if current_user.role == "super_admin":
+        branches = Branch.query.order_by(Branch.name).all()
+    else:
+        # Admin only sees their own branch
+        branches = Branch.query.filter_by(
+            id=current_user.branch_id
+        ).all()
 
     if request.method == "POST":
         role = request.form["role"]
         password = request.form.get("password")
+        branch_id = request.form.get("branch_id")
 
-        # Prevent super_admin changes
-        if user.role == "super_admin":
+        if not branch_id:
+            return "Branch is required", 400
+
+        # 🔒 Admin cannot assign super_admin role
+        if role == "super_admin" and current_user.role != "super_admin":
             abort(403)
 
-        # Update role
-        user.role = role
+        # 🔒 Admin cannot move user to another branch
+        if current_user.role != "super_admin":
+            if int(branch_id) != current_user.branch_id:
+                abort(403)
 
-        # Update password only if provided
+        user.role = role
+        user.branch_id = int(branch_id)
+
         if password:
             user.password_hash = generate_password_hash(password)
 
         db.session.commit()
         return redirect(url_for("auth.users_list"))
 
-    return render_template("edit_user.html", user=user)
+    return render_template(
+        "edit_user.html",
+        user=user,
+        branches=branches
+    )
 
 
 # ================= DELETE USER =================
@@ -140,21 +202,128 @@ def edit_user(user_id):
 @login_required
 @role_required("admin", "super_admin")
 def delete_user(user_id):
+
     user = User.query.get_or_404(user_id)
 
-    if user.username == "superadmin":
-        flash("Superadmin cannot be deleted", "error")
+    # 🔒 Block cross-branch deletion (admin cannot delete other branches)
+    if current_user.role != "super_admin":
+        if user.branch_id != current_user.branch_id:
+            abort(403)
+
+    # 🔒 Super admin accounts can NEVER be deleted (by anyone)
+    if user.role == "super_admin":
+        flash("Super admin accounts cannot be deleted.", "error")
         return redirect(url_for("auth.users_list"))
 
+    # 🔒 Prevent self-deletion
     if user.id == current_user.id:
-        flash("You cannot delete your own account", "error")
+        flash("You cannot delete your own account.", "error")
         return redirect(url_for("auth.users_list"))
 
     db.session.delete(user)
     db.session.commit()
 
-    flash("User deleted successfully", "success")
+    flash("User deleted successfully.", "success")
     return redirect(url_for("auth.users_list"))
+
+
+# ================= BRANCH LIST =================
+@auth_bp.route("/branches")
+@login_required
+@role_required("super_admin")
+def branches_list():
+
+    from app.models.branch import Branch
+
+    branches = Branch.query.order_by(Branch.name).all()
+    return render_template("branches.html", branches=branches)
+
+
+# ================= ADD BRANCH =================
+@auth_bp.route("/branches/add", methods=["GET", "POST"])
+@login_required
+@role_required("super_admin")
+def add_branch():
+
+    from app.models.branch import Branch
+
+    if request.method == "POST":
+        name = request.form["name"].strip()
+        location = request.form["location"].strip()
+
+        if not name:
+            return "Branch name is required", 400
+
+        existing = Branch.query.filter_by(name=name).first()
+        if existing:
+            return "Branch already exists", 400
+
+        branch = Branch(name=name, location=location)
+        db.session.add(branch)
+        db.session.commit()
+
+        return redirect(url_for("auth.branches_list"))
+
+    return render_template("add_branch.html")
+
+
+# ================= EDIT BRANCH =================
+@auth_bp.route("/branches/edit/<int:branch_id>", methods=["GET", "POST"])
+@login_required
+@role_required("super_admin")
+def edit_branch(branch_id):
+
+    from app.models.branch import Branch
+
+    branch = Branch.query.get_or_404(branch_id)
+
+    if request.method == "POST":
+        name = request.form["name"].strip()
+        location = request.form["location"].strip()
+
+        if not name:
+            return "Branch name is required", 400
+
+        existing = Branch.query.filter(
+            Branch.name == name,
+            Branch.id != branch.id
+        ).first()
+
+        if existing:
+            return "Another branch with this name already exists", 400
+
+        branch.name = name
+        branch.location = location
+
+        db.session.commit()
+
+        return redirect(url_for("auth.branches_list"))
+
+    return render_template("edit_branch.html", branch=branch)
+
+
+# ================= DELETE BRANCH =================
+@auth_bp.route("/branches/delete/<int:branch_id>", methods=["POST"])
+@login_required
+@role_required("super_admin")
+def delete_branch(branch_id):
+
+    from app.models.branch import Branch
+    from app.models.user import User
+
+    branch = Branch.query.get_or_404(branch_id)
+
+    # Safety check: prevent deletion if users exist
+    users_count = User.query.filter_by(branch_id=branch.id).count()
+
+    if users_count > 0:
+        return "Cannot delete branch with assigned users", 400
+
+    db.session.delete(branch)
+    db.session.commit()
+
+    return redirect(url_for("auth.branches_list"))
+
 
 @auth_bp.route("/setup", methods=["GET", "POST"])
 def setup():
@@ -165,7 +334,7 @@ def setup():
     from werkzeug.security import generate_password_hash
     from flask import abort, flash, render_template, redirect, url_for, request
 
-    # Block access if a user already exists
+    # Block if any user already exists
     if User.query.count() > 0:
         abort(403)
 
@@ -183,12 +352,12 @@ def setup():
             flash("Passwords do not match.", "error")
             return render_template("setup.html")
 
-        # 1️⃣ Create branch FIRST
+        # Create branch
         branch = Branch(name=branch_name)
         db.session.add(branch)
         db.session.commit()
 
-        # 2️⃣ Create super admin linked to branch
+        # Create super admin
         user = User(
             username=username,
             password_hash=generate_password_hash(password),

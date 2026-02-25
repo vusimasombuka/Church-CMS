@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-broadcast-tower text-primary"></i> Mass Messaging</h2>
+            <p class="text-muted mb-0">Manage and schedule SMS campaigns</p>
+        </div>
+        <div>
+            <a href="{{ url_for('messaging.list_audiences') }}" class="btn btn-primary">
+                <i class="fas fa-users"></i> Saved Audiences
+            </a>
+            <a href="{{ url_for('messaging.compose') }}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> New Message
+            </a>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+            <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" 
+                 {% if category == 'warning' %}style="background-color: #ffc107; color: #212529; border-color: #ffc107;"{% endif %}>
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+    <div class="card mb-4 shadow-sm">
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">Filter by Status</label>
+                    <select name="status" class="form-select" onchange="this.form.submit()">
+                        <option value="all" {% if status == 'all' %}selected{% endif %}>All Messages</option>
+                        <option value="draft" {% if status == 'draft' %}selected{% endif %}>Drafts</option>
+                        <option value="scheduled" {% if status == 'scheduled' %}selected{% endif %}>Scheduled</option>
+                        <option value="sending" {% if status == 'sending' %}selected{% endif %}>Sending</option>
+                        <option value="sent" {% if status == 'sent' %}selected{% endif %}>Sent</option>
+                        <option value="cancelled" {% if status == 'cancelled' %}selected{% endif %}>Cancelled</option>
+                    </select>
+                </div>
+                <div class="col-md-9 text-end">
+                    <span class="text-muted">
+                        <i class="fas fa-info-circle"></i> 
+                        Messages are processed in background jobs
+                    </span>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 30%">Message</th>
+                            <th>Status</th>
+                            <th>Recipients</th>
+                            <th>Schedule</th>
+                            <th>Progress</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for msg in messages.items %}
+                        <tr>
+                            <td>
+                                <strong>{{ msg.title }}</strong><br>
+                                <small class="text-muted">{{ msg.content[:60] }}{% if msg.content|length > 60 %}...{% endif %}</small>
+                            </td>
+                            <td>
+                                {% set badge_class = {
+                                    'sent': 'success',
+                                    'scheduled': 'warning',
+                                    'sending': 'info',
+                                    'cancelled': 'secondary',
+                                    'failed': 'danger',
+                                    'draft': 'light text-dark border'
+                                } %}
+                                <span class="badge bg-{{ badge_class.get(msg.status, 'secondary') }}">
+                                    {{ msg.status.title() }}
+                                </span>
+                            </td>
+                            <td>{{ msg.total_recipients }}</td>
+                            <td>
+                                {% if msg.scheduled_at %}
+                                    <small>
+                                        {{ msg.scheduled_at.strftime('%Y-%m-%d') }}<br>
+                                        {{ msg.scheduled_at.strftime('%H:%M') }}
+                                    </small>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td style="width: 20%">
+                                {% if msg.status == 'sent' and msg.total_recipients > 0 %}
+                                    <div class="d-flex align-items-center">
+                                        <div class="progress flex-grow-1" style="height: 8px;">
+                                            <div class="progress-bar bg-success" style="width: {{ (msg.sent_count / msg.total_recipients * 100) }}%"></div>
+                                            {% if msg.failed_count > 0 %}
+                                            <div class="progress-bar bg-danger" style="width: {{ (msg.failed_count / msg.total_recipients * 100) }}%"></div>
+                                            {% endif %}
+                                        </div>
+                                        <small class="ms-2 text-muted">{{ msg.sent_count }}/{{ msg.total_recipients }}</small>
+                                    </div>
+                                    {% if msg.failed_count > 0 %}
+                                    <small class="text-danger">{{ msg.failed_count }} failed</small>
+                                    {% endif %}
+                                {% elif msg.status == 'sending' %}
+                                    <div class="progress" style="height: 8px;">
+                                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                             style="width: {{ (msg.sent_count / msg.total_recipients * 100) if msg.total_recipients > 0 else 0 }}%">
+                                        </div>
+                                    </div>
+                                    <small class="text-muted">Sending...</small>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+    <div class="btn-group btn-group-sm">
+        <a href="{{ url_for('messaging.report', id=msg.id) }}" class="btn btn-info" style="color: white;">
+            <i class="fas fa-chart-bar"></i> Report
+        </a>
+        {% if msg.is_editable %}
+        <form method="post" action="{{ url_for('messaging.cancel_message', id=msg.id) }}" class="d-inline" onsubmit="return confirm('Cancel this message?');">
+            <button type="submit" class="btn btn-warning">
+                <i class="fas fa-ban"></i> Cancel
+            </button>
+        </form>
+        {% endif %}
+    </div>
+</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-5">
+                                <i class="fas fa-inbox fa-3x mb-3 d-block"></i>
+                                No messages found.<br>
+                                <a href="{{ url_for('messaging.compose') }}" class="btn btn-sm btn-primary mt-2">Create your first message</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if messages.pages > 1 %}
+            <nav aria-label="Page navigation" class="mt-3">
+                <ul class="pagination justify-content-center mb-0">
+                    {% if messages.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('messaging.index', page=messages.prev_num, status=status) }}">Previous</a>
+                    </li>
+                    {% endif %}
+                    {% for page_num in messages.iter_pages(left_edge=2, left_current=2, right_current=3, right_edge=2) %}
+                        {% if page_num %}
+                            {% if page_num == messages.page %}
+                            <li class="page-item active"><span class="page-link">{{ page_num }}</span></li>
+                            {% else %}
+                            <li class="page-item"><a class="page-link" href="{{ url_for('messaging.index', page=page_num, status=status) }}">{{ page_num }}</a></li>
+                            {% endif %}
+                        {% else %}
+                            <li class="page-item disabled"><span class="page-link">...</span></li>
+                        {% endif %}
+                    {% endfor %}
+                    {% if messages.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('messaging.index', page=messages.next_num, status=status) }}">Next</a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

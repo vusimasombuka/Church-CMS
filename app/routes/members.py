@@ -14,12 +14,13 @@ members_bp = Blueprint("members", __name__, url_prefix="/members")
 @role_required("super_admin", "admin")
 def list_members():
 
+    from app.utils.branching import branch_query
+
     page = request.args.get("page", 1, type=int)
 
-    members = Member.query.filter_by(
-        branch_id=current_user.branch_id
-).order_by(Member.created_at.desc()).paginate(page=page, per_page=25)
-
+    members = branch_query(Member) \
+        .order_by(Member.created_at.desc()) \
+        .paginate(page=page, per_page=25)
 
     return render_template("members.html", members=members)
 
@@ -100,13 +101,15 @@ def add_member():
     departments = Lookup.query.filter_by(category="department").all()
     titles = Lookup.query.filter_by(category="title").all()
     marital_statuses = Lookup.query.filter_by(category="marital_status").all()
+    member_statuses = Lookup.query.filter_by(category="member_status").all()
 
     return render_template(
-    "add_member.html",
-    departments=departments,
-    titles=titles,
-    marital_statuses=marital_statuses
-)
+        "add_member.html",
+        departments=departments,
+        titles=titles,
+        marital_statuses=marital_statuses,
+        member_statuses=member_statuses
+    )
 
 
 
@@ -116,7 +119,10 @@ def add_member():
 @role_required("super_admin", "admin")
 def edit_member(id):
 
+    from app.utils.branching import enforce_branch_access, branch_query
+
     member = Member.query.get_or_404(id)
+    enforce_branch_access(member)
 
     if request.method == "POST":
 
@@ -124,22 +130,35 @@ def edit_member(id):
         member.first_name = request.form.get("first_name")
         member.last_name = request.form.get("last_name")
         member.gender = request.form.get("gender")
-        
+
         new_phone = normalize_sa_phone(request.form.get("phone"))
-        
-        # 🔒 CHECK IF NEW PHONE EXISTS ON ANOTHER MEMBER OR VISITOR (excluding current member)
+
+        # 🔒 BRANCH-AWARE DUPLICATE CHECK
         if new_phone != member.phone:
-            existing_member = Member.query.filter(Member.phone == new_phone, Member.id != id).first()
-            existing_visitor = Visitor.query.filter_by(phone=new_phone).first()
-            
+
+            existing_member = branch_query(Member) \
+                .filter(Member.phone == new_phone, Member.id != id) \
+                .first()
+
+            existing_visitor = branch_query(Visitor) \
+                .filter_by(phone=new_phone) \
+                .first()
+
             if existing_member:
-                flash(f"Phone number already exists on another member: {existing_member.first_name} {existing_member.last_name}", "error")
+                flash(
+                    f"Phone already exists on member: "
+                    f"{existing_member.first_name} {existing_member.last_name}",
+                    "error"
+                )
                 return redirect(url_for("members.edit_member", id=id))
-            
+
             if existing_visitor:
-                flash(f"Phone number exists on a visitor record. Please convert the visitor first.", "warning")
+                flash(
+                    "Phone exists on a visitor record. Convert visitor first.",
+                    "warning"
+                )
                 return redirect(url_for("visitors.visitors_list"))
-        
+
         member.phone = new_phone
         member.email = request.form.get("email")
         member.street_address = request.form.get("street_address")
@@ -166,17 +185,18 @@ def edit_member(id):
         flash("Member updated successfully.", "success")
         return redirect(url_for("members.list_members"))
 
-    # ✅ ADD THIS PART (lookup data for dropdowns)
     from app.models.lookup import Lookup
 
     departments = Lookup.query.filter_by(category="department").all()
     titles = Lookup.query.filter_by(category="title").all()
     marital_statuses = Lookup.query.filter_by(category="marital_status").all()
+    member_statuses = Lookup.query.filter_by(category="member_status").all()
 
     return render_template(
         "edit_member.html",
         member=member,
         departments=departments,
         titles=titles,
-        marital_statuses=marital_statuses
+        marital_statuses=marital_statuses,
+        member_statuses=member_statuses
     )

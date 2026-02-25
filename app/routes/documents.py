@@ -22,7 +22,9 @@ UPLOAD_FOLDER = os.path.join("instance", "uploads")
 @login_required
 def documents_list():
 
-    # Create Category
+    from app.utils.branching import branch_query, enforce_branch_access
+
+    # CREATE CATEGORY
     if request.method == "POST" and "new_category" in request.form:
         name = request.form.get("new_category").strip()
 
@@ -36,29 +38,27 @@ def documents_list():
 
         return redirect(url_for("documents.documents_list"))
 
-    # Filters
     search = request.args.get("search")
     selected_category = request.args.get("category", type=int)
 
-    categories = DocumentCategory.query.filter_by(
-        branch_id=current_user.branch_id
-    ).order_by(DocumentCategory.name).all()
+    # Categories
+    if current_user.role == "super_admin":
+        categories = DocumentCategory.query.order_by(DocumentCategory.name).all()
+    else:
+        categories = DocumentCategory.query.filter_by(
+            branch_id=current_user.branch_id
+        ).order_by(DocumentCategory.name).all()
 
-    query = Document.query.filter_by(
-        branch_id=current_user.branch_id
-    )
+    # Documents
+    query = branch_query(Document)
 
     if selected_category:
         query = query.filter_by(category_id=selected_category)
 
     if search:
-        query = query.filter(
-            Document.name.ilike(f"%{search}%")
-        )
+        query = query.filter(Document.name.ilike(f"%{search}%"))
 
-    documents = query.order_by(
-        Document.created_at.desc()
-    ).all()
+    documents = query.order_by(Document.created_at.desc()).all()
 
     return render_template(
         "documents.html",
@@ -76,43 +76,47 @@ def documents_list():
 @role_required("super_admin", "admin")
 def upload_document():
 
+    from app.utils.branching import enforce_branch_access
+
     if request.method == "POST":
+
         file = request.files.get("file")
         name = request.form.get("name")
+        category_id = request.form.get("category_id", type=int)
 
-        if not file or not name:
-            return "Missing document name or file", 400
+        if not file or not name or not category_id:
+            return "Missing required fields", 400
+
+        category = DocumentCategory.query.get_or_404(category_id)
+        enforce_branch_access(category)
 
         filename = secure_filename(file.filename)
-        path = os.path.join(UPLOAD_FOLDER, filename)
 
         upload_folder = os.path.join(current_app.instance_path, "uploads")
         os.makedirs(upload_folder, exist_ok=True)
-        path = os.path.join(upload_folder, filename)
-        file.save(path)
 
-        category_id = request.form.get("category_id", type=int)
-
-        if not category_id:
-            return "Category is required", 400
+        file.save(os.path.join(upload_folder, filename))
 
         doc = Document(
             name=name,
             filename=filename,
             uploaded_by=current_user.username,
-            branch_id=current_user.branch_id,
-            category_id=category_id
+            branch_id=category.branch_id,
+            category_id=category.id
         )
-
 
         db.session.add(doc)
         db.session.commit()
 
         return redirect(url_for("documents.documents_list"))
 
-    categories = DocumentCategory.query.filter_by(
-        branch_id=current_user.branch_id
-    ).order_by(DocumentCategory.name).all()
+    # CATEGORY LIST
+    if current_user.role == "super_admin":
+        categories = DocumentCategory.query.order_by(DocumentCategory.name).all()
+    else:
+        categories = DocumentCategory.query.filter_by(
+            branch_id=current_user.branch_id
+        ).order_by(DocumentCategory.name).all()
 
     return render_template(
         "upload_document.html",
@@ -143,10 +147,13 @@ import os
 @documents_bp.route("/download/<int:doc_id>")
 @login_required
 def download_document(doc_id):
+
+    from app.utils.branching import enforce_branch_access
+
     doc = Document.query.get_or_404(doc_id)
+    enforce_branch_access(doc)
 
     upload_folder = os.path.join(current_app.instance_path, "uploads")
-    file_path = os.path.join(upload_folder, doc.filename)
 
     return send_from_directory(
         upload_folder,
@@ -162,16 +169,18 @@ def download_document(doc_id):
 @login_required
 @role_required("super_admin", "admin")
 def delete_document(doc_id):
+
+    from app.utils.branching import enforce_branch_access
+
     doc = Document.query.get_or_404(doc_id)
+    enforce_branch_access(doc)
 
     upload_folder = os.path.join(current_app.instance_path, "uploads")
     file_path = os.path.join(upload_folder, doc.filename)
 
-    # delete physical file if it exists
     if os.path.exists(file_path):
         os.remove(file_path)
 
-    # delete database record
     db.session.delete(doc)
     db.session.commit()
 
@@ -183,9 +192,11 @@ def delete_document(doc_id):
 @role_required("super_admin", "admin")
 def delete_category(category_id):
 
-    category = DocumentCategory.query.get_or_404(category_id)
+    from app.utils.branching import enforce_branch_access
 
-    # Prevent deletion if documents exist
+    category = DocumentCategory.query.get_or_404(category_id)
+    enforce_branch_access(category)
+
     if category.documents:
         flash("Cannot delete category with documents inside.", "error")
         return redirect(url_for("documents.documents_list"))
@@ -202,13 +213,14 @@ def delete_category(category_id):
 @login_required
 @role_required("super_admin", "admin")
 def add_category():
+
     name = request.form.get("name")
 
     if not name:
         return redirect(url_for("documents.documents_list"))
 
     category = DocumentCategory(
-        name=name,
+        name=name.strip(),
         branch_id=current_user.branch_id
     )
 

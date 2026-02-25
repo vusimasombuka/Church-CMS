@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Branches{% endblock %}
+
+{% block content %}
+
+<h2>Branches</h2>
+
+<a href="{{ url_for('auth.add_branch') }}">
+    <button class="btn btn-success">Add Branch</button>
+</a>
+
+<br><br>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Location</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for branch in branches %}
+        <tr>
+            <td>{{ branch.id }}</td>
+            <td>{{ branch.name }}</td>
+            <td>{{ branch.location }}</td>
+            <td>
+
+                <a href="{{ url_for('auth.edit_branch', branch_id=branch.id) }}">
+                    <button class="btn btn-primary">Edit</button>
+                </a>
+
+                <form method="POST"
+                      action="{{ url_for('auth.delete_branch', branch_id=branch.id) }}"
+                      style="display:inline;"
+                      onsubmit="return confirm('Delete this branch?');">
+
+                    <button type="submit" class="btn btn-danger">
+                        Delete
+                    </button>
+                </form>
+
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% endblock %}

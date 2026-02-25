@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-users text-primary"></i> Saved Audiences</h2>
+            <p class="text-muted mb-0">Create reusable audience segments for targeted messaging</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('messaging.index') }}" class="btn btn-primary btn-sm">
+                <i class="fas fa-arrow-left"></i> Back to Messaging
+            </a>
+            <a href="{{ url_for('messaging.compose') }}" class="btn btn-primary btn-sm">
+                <i class="fas fa-plus"></i> Create Audience
+            </a>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Name</th>
+                            <th>Description</th>
+                            <th class="text-center">Count</th>
+                            <th>Type</th>
+                            <th>Created</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for seg in segments.items %}
+                        <tr>
+                            <td>
+                                <strong>{{ seg.name }}</strong>
+                                {% if seg.filter_criteria %}
+                                <br><small class="text-muted">{{ seg.filter_criteria|length }} filter(s)</small>
+                                {% endif %}
+                            </td>
+                            <td>{{ seg.description or '-' }}</td>
+                            <td class="text-center">
+                                <span class="badge bg-info fs-6">{{ seg.estimated_count }}</span>
+                            </td>
+                            <td>
+                                {% if seg.is_system %}
+                                    <span class="badge bg-primary">System</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Custom</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ seg.created_at.strftime('%Y-%m-%d') if seg.created_at else '-' }}</td>
+                            <td class="text-end">
+                                <button class="btn btn-sm btn-outline-primary" onclick="editSegment({{ seg.id }}, '{{ seg.name|escape }}', '{{ seg.description|escape }}', {{ seg.filter_criteria|tojson }}, {{ seg.is_system|lower }})">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                {% if seg.mass_messages %}
+                                    <span class="badge bg-secondary">
+                                        <i class="fas fa-lock"></i> In Use
+                                    </span>
+                                {% else %}
+                                    <form method="post" action="{{ url_for('messaging.delete_segment', id=seg.id) }}" class="d-inline" onsubmit="return confirm('Delete?');">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-4">
+                                <i class="fas fa-inbox fa-3x mb-3 d-block"></i>
+                                No saved audiences yet.<br>
+                                <small>Create your first audience in Compose Message</small>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if segments.pages > 1 %}
+            <nav aria-label="Page navigation" class="mt-3">
+                <ul class="pagination justify-content-center mb-0">
+                    {% if segments.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('messaging.list_audiences', page=segments.prev_num) }}">Previous</a>
+                    </li>
+                    {% endif %}
+                    {% for page_num in segments.iter_pages(left_edge=2, left_current=2, right_current=3, right_edge=2) %}
+                        {% if page_num %}
+                            {% if page_num == segments.page %}
+                            <li class="page-item active"><span class="page-link">{{ page_num }}</span></li>
+                            {% else %}
+                            <li class="page-item"><a class="page-link" href="{{ url_for('messaging.list_audiences', page=page_num) }}">{{ page_num }}</a></li>
+                            {% endif %}
+                        {% else %}
+                            <li class="page-item disabled"><span class="page-link">...</span></li>
+                        {% endif %}
+                    {% endfor %}
+                    {% if segments.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('messaging.list_audiences', page=segments.next_num) }}">Next</a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Edit Modal Only (Create moved to Compose page) -->
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="post" id="editForm" action="">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Audience</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Audience Name *</label>
+                        <input type="text" name="name" id="edit_name" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea name="description" id="edit_description" class="form-control" rows="2"></textarea>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> 
+                        Update filters below. The count will be recalculated automatically.
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-bold">Gender</label>
+                            <div class="form-check">
+                                <input class="form-check-input edit-filter" type="checkbox" name="gender" value="male" id="e_male">
+                                <label class="form-check-label" for="e_male">Male</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input edit-filter" type="checkbox" name="gender" value="female" id="e_female">
+                                <label class="form-check-label" for="e_female">Female</label>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-bold">Criteria</label>
+                            <div class="form-check">
+                                <input class="form-check-input edit-filter" type="checkbox" name="baptized" value="true" id="e_baptized">
+                                <label class="form-check-label" for="e_baptized">Baptized</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input edit-filter" type="checkbox" name="membership_course" value="true" id="e_course">
+                                <label class="form-check-label" for="e_course">Membership Course</label>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-bold">Marital Status</label>
+                            <select name="marital_status" class="form-select edit-filter" multiple size="3" id="e_marital">
+                                <option value="single">Single</option>
+                                <option value="married">Married</option>
+                                <option value="divorced">Divorced</option>
+                                <option value="widowed">Widowed</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Department</label>
+                            <select name="department" class="form-select edit-filter" multiple size="3" id="e_department">
+                                <option value="Ushering">Ushering</option>
+                                <option value="Worship">Worship</option>
+                                <option value="Children">Children</option>
+                                <option value="Youth">Youth</option>
+                                <option value="Men">Men</option>
+                                <option value="Women">Women</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Update Audience</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function editSegment(id, name, description, criteria, isSystem) {
+    document.getElementById('editForm').action = '/messaging/edit-segment/' + id;
+    document.getElementById('edit_name').value = name;
+    document.getElementById('edit_description').value = description;
+    
+    document.querySelectorAll('.edit-filter').forEach(el => {
+        if (el.type === 'checkbox') el.checked = false;
+        if (el.tagName === 'SELECT') Array.from(el.options).forEach(opt => opt.selected = false);
+    });
+    
+    if (criteria) {
+        if (criteria.gender) {
+            criteria.gender.forEach(val => {
+                const cb = document.getElementById('e_' + val);
+                if (cb) cb.checked = true;
+            });
+        }
+        if (criteria.baptized) document.getElementById('e_baptized').checked = true;
+        if (criteria.membership_course) document.getElementById('e_course').checked = true;
+        
+        if (criteria.marital_status) {
+            const select = document.getElementById('e_marital');
+            Array.from(select.options).forEach(opt => {
+                if (criteria.marital_status.includes(opt.value)) opt.selected = true;
+            });
+        }
+        
+        if (criteria.department) {
+            const select = document.getElementById('e_department');
+            Array.from(select.options).forEach(opt => {
+                if (criteria.department.includes(opt.value)) opt.selected = true;
+            });
+        }
+    }
+    
+    new bootstrap.Modal(document.getElementById('editModal')).show();
+}
+</script>
+{% endblock %}

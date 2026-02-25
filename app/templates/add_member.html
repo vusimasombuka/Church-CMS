@@ -63,21 +63,25 @@
 <label>Section</label>
 <input name="section">
 
-<h3>Church Details</h3>
-<label>Department</label>
-<select name="department" required>
-    <option value="">Select Department</option>
-    {% for dept in departments %}
+<div class="mb-3">
+    <label class="form-label">Department</label>
+    <select name="department" class="form-select" required>
+        <option value="">Select Department</option>
+        {% for dept in departments %}
         <option value="{{ dept.value }}">{{ dept.value }}</option>
-    {% endfor %}
-</select>
+        {% endfor %}
+    </select>
+</div>
 
-
-<label>Member Status</label>
-<select name="member_status">
-    <option value="active">Active</option>
-    <option value="inactive">Inactive</option>
-</select>
+<div class="mb-3">
+    <label class="form-label">Member Status</label>
+    <select name="member_status" class="form-select">
+        <option value="">-- Select Status --</option>
+        {% for status in member_statuses %}
+        <option value="{{ status.value }}">{{ status.value }}</option>
+        {% endfor %}
+    </select>
+</div>
 
 <div class="checkbox-row">
     <input type="checkbox" name="membership_course">

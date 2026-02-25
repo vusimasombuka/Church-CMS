@@ -6,9 +6,9 @@ from app.models.visitor import Visitor
 from app.models.check_in import CheckIn
 from app.models.giving import Giving
 from app.models.member import Member
+from app.utils.branching import branch_query, enforce_branch_access
 
 visitors_bp = Blueprint("visitors", __name__, url_prefix="/visitors")
-
 
 # ================= VISITORS LIST =================
 @visitors_bp.route("/")
@@ -16,18 +16,19 @@ visitors_bp = Blueprint("visitors", __name__, url_prefix="/visitors")
 @role_required("super_admin", "admin", "usher")
 def visitors_list():
 
+    from app.utils.branching import branch_query
+    from app.models.check_in import CheckIn
+
     page = request.args.get("page", 1, type=int)
 
-    from flask_login import current_user
+    base_query = branch_query(Visitor)
 
     query = (
-        Visitor.query
-        .filter(Visitor.branch_id == current_user.branch_id)
+        base_query
         .outerjoin(CheckIn, CheckIn.visitor_id == Visitor.id)
         .group_by(Visitor.id)
         .order_by(db.func.max(CheckIn.check_in_date).desc())
-    )   
-
+    )
 
     visitors = query.paginate(page=page, per_page=25)
 
@@ -42,16 +43,17 @@ def visitors_list():
 def convert_to_member(visitor_id):
 
     visitor = Visitor.query.get_or_404(visitor_id)
+    enforce_branch_access(visitor)
 
-    if visitor is None:
-        flash("Visitor not found.", "error")
-        return redirect(url_for("visitors.visitors_list"))
+    # 🔒 Branch-aware duplicate check
+    existing_member = branch_query(Member).filter_by(
+        phone=visitor.phone
+    ).first()
 
-    # 🔒 CHECK IF MEMBER WITH THIS PHONE ALREADY EXISTS (but allow if it's the same person being converted)
-    existing_member = Member.query.filter_by(phone=visitor.phone).first()
     if existing_member:
         flash(
-            f"A member with this phone number already exists: {existing_member.first_name} {existing_member.last_name}. "
+            f"A member with this phone number already exists: "
+            f"{existing_member.first_name} {existing_member.last_name}. "
             f"Cannot convert - would create duplicate.",
             "error"
         )
@@ -69,19 +71,18 @@ def convert_to_member(visitor_id):
     db.session.add(member)
     db.session.flush()
 
-    # ================= RELINK GIVING =================
-    Giving.query.filter_by(visitor_id=visitor.id).update({
+    # 🔒 Relink Giving (branch isolated)
+    branch_query(Giving).filter_by(visitor_id=visitor.id).update({
         Giving.member_id: member.id,
         Giving.visitor_id: None
     })
 
-    # ================= RELINK CHECK-INS =================
-    CheckIn.query.filter_by(visitor_id=visitor.id).update({
+    # 🔒 Relink CheckIns (branch isolated)
+    branch_query(CheckIn).filter_by(visitor_id=visitor.id).update({
         CheckIn.member_id: member.id,
         CheckIn.visitor_id: None
     })
 
-    # ================= DELETE VISITOR =================
     db.session.delete(visitor)
     db.session.commit()
 

@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Edit Branch{% endblock %}
+
+{% block content %}
+
+<h2>Edit Branch</h2>
+
+<form method="POST">
+
+    <label>Branch Name</label>
+    <input type="text" name="name" value="{{ branch.name }}" required>
+
+    <label>Location</label>
+    <input type="text" name="location" value="{{ branch.location }}">
+
+    <button type="submit">Save Changes</button>
+
+</form>
+
+{% endblock %}

@@ -36,7 +36,7 @@ class Member(db.Model):
     last_birthday_sms_year = db.Column(db.Integer)
 
     branch_id = db.Column(
-        db.Integer,
-        db.ForeignKey("branches.id", name="fk_member_branch_id"),
-        nullable=True  # ADDED: nullable for phone-less members
-    )
+    db.Integer,
+    db.ForeignKey("branches.id", name="fk_member_branch_id"),
+    nullable=False
+)

@@ -12,6 +12,14 @@
     <label>Password</label>
     <input type="password" name="password" required>
 
+    <label>Branch</label>
+<select name="branch_id" required>
+    <option value="">-- Select Branch --</option>
+    {% for branch in branches %}
+        <option value="{{ branch.id }}">{{ branch.name }}</option>
+    {% endfor %}
+</select>
+
     <label>Role</label>
     <select name="role" required>
         <option value="usher">Usher</option>
@@ -20,6 +28,7 @@
     </select>
 
     <button type="submit">Create User</button>
+
 </form>
 
 {% endblock %}

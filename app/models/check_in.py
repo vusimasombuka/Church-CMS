@@ -4,7 +4,7 @@ from datetime import date, datetime
 class CheckIn(db.Model):
     id = db.Column(db.Integer, primary_key=True)
 
-    phone = db.Column(db.String(20), nullable=False)
+    phone = db.Column(db.String(20), nullable=True)
     
     check_in_date = db.Column(db.Date, default=date.today)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -13,7 +13,7 @@ class CheckIn(db.Model):
     member_id = db.Column(db.Integer, db.ForeignKey("member.id"))
     service_id = db.Column(db.Integer, db.ForeignKey("services.id"), nullable=False)
     service = db.relationship("Service")
-
+    branch_id = db.Column(db.Integer, db.ForeignKey("branches.id", name="fk_checkin_branch_id"), nullable=False, index=True)
 
 
     __table_args__ = (

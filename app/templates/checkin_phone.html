@@ -7,14 +7,17 @@
 <form method="POST">
 
     <label>Cellphone Number</label>
-    <input name="phone" placeholder="0821234567 or +27821234567" optional>
+    <input name="phone" placeholder="0821234567 or +27821234567">
 
     <label>Service Attended</label>
     <select name="service_id" required>
         <option value="">-- Select Service --</option>
-        {% for s in services %}
-            <option value="{{ s.id }}">
-                {{ s.name }} - {{ s.day_of_week }} {{ s.time }}
+        {% for service in services %}
+            <option value="{{ service.id }}">
+                {{ service.name }} - {{ service.day_of_week }} {{ service.time }}
+                {% if current_user.role == "super_admin" and service.branch %}
+                    ({{ service.branch.name }})
+                {% endif %}
             </option>
         {% endfor %}
     </select>
@@ -22,5 +25,12 @@
     <button type="submit">Check In</button>
     
 </form>
+
+<!-- ADDED: Link for visitors without phones -->
+<p style="margin-top: 30px; text-align: center;">
+    <a href="{{ url_for('checkin.check_in_no_phone') }}" style="color: #1abc9c; text-decoration: underline; font-weight: 600;">
+        Check in visitor without phone number →
+    </a>
+</p>
 
 {% endblock %}

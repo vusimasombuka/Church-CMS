@@ -34,54 +34,51 @@ from sqlalchemy import func, extract
 @role_required("super_admin", "admin", "finance")
 def giving_dashboard():
 
+    from app.utils.branching import branch_query
+    from sqlalchemy import extract
+
     now = datetime.utcnow()
 
-    # =========================
-    # DATE RANGE FOR CURRENT MONTH
-    # =========================
     start_of_month = datetime(now.year, now.month, 1)
-
     if now.month == 12:
         end_of_month = datetime(now.year + 1, 1, 1)
     else:
         end_of_month = datetime(now.year, now.month + 1, 1)
 
-    # =========================
+    base_query = branch_query(Giving)
+
     # TOTALS
-    # =========================
-    total_amount = (
-        db.session.query(func.sum(Giving.amount))
-        .scalar()
-        or 0
-    )
+    total_amount = base_query.with_entities(func.sum(Giving.amount)).scalar() or 0
 
     month_total = (
-        db.session.query(func.sum(Giving.amount))
+        base_query
         .filter(Giving.created_at >= start_of_month)
         .filter(Giving.created_at < end_of_month)
+        .with_entities(func.sum(Giving.amount))
         .scalar()
         or 0
     )
 
     member_total = (
-        db.session.query(func.sum(Giving.amount))
+        base_query
         .filter(Giving.member_id.isnot(None))
+        .with_entities(func.sum(Giving.amount))
         .scalar()
         or 0
     )
 
     visitor_total = (
-        db.session.query(func.sum(Giving.amount))
+        base_query
         .filter(Giving.visitor_id.isnot(None))
+        .with_entities(func.sum(Giving.amount))
         .scalar()
         or 0
     )
 
-    # =========================
-    # MONTHLY TOTALS (Grouped by Year + Month)
-    # =========================
+    # MONTHLY TOTALS
     raw_monthly = (
-        db.session.query(
+        base_query
+        .with_entities(
             extract("year", Giving.created_at).label("year"),
             extract("month", Giving.created_at).label("month"),
             func.sum(Giving.amount)
@@ -99,14 +96,10 @@ def giving_dashboard():
         for year, month, total in raw_monthly
     ]
 
-    # =========================
     # CATEGORY TOTALS
-    # =========================
     raw_types = (
-        db.session.query(
-            Giving.giving_type,
-            func.sum(Giving.amount)
-        )
+        base_query
+        .with_entities(Giving.giving_type, func.sum(Giving.amount))
         .group_by(Giving.giving_type)
         .all()
     )
@@ -116,34 +109,24 @@ def giving_dashboard():
         for t, a in raw_types
     ]
 
-    # =========================
-    # MEMBER / VISITOR TOTALS
-    # =========================
-    type_totals = [
-        {"type": "Members", "total": float(member_total)},
-        {"type": "Visitors", "total": float(visitor_total)}
-    ]
-
-    # =========================
-    # MEMBER / VISITOR %
-    # =========================
-    total_for_percentage = member_total + visitor_total
-
-    if total_for_percentage > 0:
-        member_percentage = (member_total / total_for_percentage) * 100
-        visitor_percentage = (visitor_total / total_for_percentage) * 100
-    else:
-        member_percentage = 0
-        visitor_percentage = 0
-
-    # =========================
     # RECENT GIVING
-    # =========================
     recent_giving = (
-        db.session.query(Giving)
+        base_query
         .order_by(Giving.created_at.desc())
         .limit(10)
         .all()
+    )
+
+    total_for_percentage = member_total + visitor_total
+
+    member_percentage = (
+        (member_total / total_for_percentage) * 100
+        if total_for_percentage > 0 else 0
+    )
+
+    visitor_percentage = (
+        (visitor_total / total_for_percentage) * 100
+        if total_for_percentage > 0 else 0
     )
 
     return render_template(
@@ -154,7 +137,10 @@ def giving_dashboard():
         visitor_total=float(visitor_total),
         monthly_totals=monthly_totals,
         category_totals=category_totals,
-        type_totals=type_totals,
+        type_totals=[
+            {"type": "Members", "total": float(member_total)},
+            {"type": "Visitors", "total": float(visitor_total)}
+        ],
         member_percentage=member_percentage,
         visitor_percentage=visitor_percentage,
         recent_giving=recent_giving
@@ -171,8 +157,10 @@ from io import StringIO
 @role_required("super_admin", "admin", "finance")
 def export_recent_giving():
 
+    from app.utils.branching import branch_query
+
     recent_giving = (
-        Giving.query
+        branch_query(Giving)
         .order_by(Giving.created_at.desc())
         .all()
     )
@@ -206,14 +194,17 @@ def export_recent_giving():
 @role_required("super_admin", "admin", "finance")
 def export_monthly_summary():
 
+    from app.utils.branching import branch_query
+
     raw_monthly = (
-        db.session.query(
-            func.strftime("%Y-%m", Giving.created_at),
-            func.sum(Giving.amount)
-        )
-        .group_by(func.strftime("%Y-%m", Giving.created_at))
-        .order_by(func.strftime("%Y-%m", Giving.created_at))
-        .all()
+    branch_query(Giving)
+    .with_entities(
+        func.strftime("%Y-%m", Giving.created_at),
+        func.sum(Giving.amount)
+    )
+    .group_by(func.strftime("%Y-%m", Giving.created_at))
+    .order_by(func.strftime("%Y-%m", Giving.created_at))
+    .all()
     )
 
     si = StringIO()
@@ -309,7 +300,7 @@ def add_giving():
                     related_table="giving",
                     related_id=giving.id,
                     status="pending",
-                    branch_id=current_user.branch_id,
+                    branch_id=giving.branch_id,
                     template_id=template.id
                 )
 

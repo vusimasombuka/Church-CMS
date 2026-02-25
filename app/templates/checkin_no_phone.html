@@ -5,25 +5,25 @@
 <h2>Check In Without Phone</h2>
 
 <form method="POST" action="{{ url_for('checkin.check_in') }}">
-    <input type="hidden" name="service_id" value="{{ service_id }}">
     
     <label>First Name *</label>
-    <input name="first_name" required>
+    <input name="first_name" required placeholder="Visitor's first name">
 
     <label>Last Name *</label>
-    <input name="last_name" required>
+    <input name="last_name" required placeholder="Visitor's last name">
     
-    <label>Service</label>
+    <label>Service Attended *</label>
     <select name="service_id" required>
-        {% for s in services %}
-            <option value="{{ s.id }}" {% if s.id == service_id|int %}selected{% endif %}>
-                {{ s.name }} - {{ s.day_of_week }} {{ s.time }}
+        <option value="">-- Select Service --</option>
+        {% for service in services %}
+            <option value="{{ service.id }}">
+                {{ service.name }} - {{ service.day_of_week }} {{ service.time }}
+                {% if current_user.role == "super_admin" and service.branch %}
+                    ({{ service.branch.name }})
+                {% endif %}
             </option>
         {% endfor %}
     </select>
-
-    <label>Alternative Contact (optional)</label>
-    <input name="alternative_contact" placeholder="Email, WhatsApp, or relative's phone">
 
     <button type="submit">Check In</button>
 </form>

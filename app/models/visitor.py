@@ -12,10 +12,10 @@ class Visitor(db.Model):
     email = db.Column(db.String(120))  # ADDED: separate email field
     
     branch_id = db.Column(
-        db.Integer,
-        db.ForeignKey("branches.id", name="fk_visitor_branch_id"),
-        nullable=True
-    )
+    db.Integer,
+    db.ForeignKey("branches.id", name="fk_visitor_branch_id"),
+    nullable=False
+)
 
     @property
     def visit_count(self):

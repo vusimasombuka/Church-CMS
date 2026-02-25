@@ -26,4 +26,11 @@ class InventoryItem(db.Model):
         nullable=False
     )
 
+    branch_id = db.Column(
+    db.Integer,
+    db.ForeignKey("branches.id", name="fk_inventory_branch_id"),
+    nullable=False,
+    index=True
+    )
+
     created_at = db.Column(db.DateTime, server_default=db.func.now())
