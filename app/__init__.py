@@ -170,13 +170,13 @@ def create_app():
     #        logger.info("No branches found. Ready for /setup")
 
         # ================= CREATE TABLES (Development Only) =================
-    with app.app_context():
-        db.create_all()  # Creates all tables based on your models
-        logger.info("Database tables created")
-        
-        # Check if setup needed
-        if Branch.query.count() == 0:
-            logger.info("No branches found. Ready for /setup")
+    #with app.app_context():
+    #    db.create_all()  # Creates all tables based on your models
+    #    logger.info("Database tables created")
+    #    
+    #    # Check if setup needed
+    #    if Branch.query.count() == 0:
+    #        logger.info("No branches found. Ready for /setup")
     # ================================================================
     
     return app
